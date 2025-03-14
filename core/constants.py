@@ -1,6 +1,17 @@
 SERVICE_NAME = "flattener"
 
+EXPORT_PARQUET_COMPRESSION="snappy"
+
+PROCESSOR_ENDPOINT = "https://ccc-flattener-eaf-dev-1061430463455.us-central1.run.app"
+
 DUCKDB_FORMAT_STRING = "(FORMAT 'parquet', COMPRESSION 'zstd')"
 DUCKDB_MEMORY_LIMIT = "10GB"
 DUCKDB_MAX_SIZE = "500GB"
 DUCKDB_THREADS = "4"
+
+IGNORE_FIELDS = [
+    '__key__', '__error__', '__has_error__', 'treeJSON', 'namespace', 'app', 
+    'path', 'kind', 'name', 'id', 'COMPLETED', 'COMPLETED_TS', 'sha', '569151507',
+    'D_726699695_V2', 'Module2', 'undefined', 'key', 'query', 'D_726699695','D_299215535',
+    'D_166676176', 'd_110349197', 'd_543608829'
+]

@@ -5,6 +5,7 @@ from fsspec import filesystem  # type: ignore
 import logging
 import sys
 import os
+
 """
 Set up a logging instance that will write to stdout (and therefor show up in Google Cloud logs)
 """
@@ -62,3 +63,4 @@ def close_duckdb_connection(conn: duckdb.DuckDBPyConnection, local_db_file: str)
 
     except Exception as e:
         logger.error(f"Unable to close DuckDB connection: {e}")
+
