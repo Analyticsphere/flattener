@@ -1,5 +1,6 @@
 from google.cloud import bigquery
-import constants, utils
+import core.constants as constants
+import core.utils as utils
 from google.cloud import storage
 
 

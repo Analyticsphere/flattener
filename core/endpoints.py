@@ -1,6 +1,6 @@
 import os
-import utils
-import constants
+import core.utils as utils
+import core.constants as constants
 from datetime import datetime
 from typing import Any, Optional
 import core.gcp_client as gcp_client

@@ -2,8 +2,6 @@ SERVICE_NAME = "flattener"
 
 EXPORT_PARQUET_COMPRESSION="snappy"
 
-PROCESSOR_ENDPOINT = "https://ccc-flattener-eaf-dev-1061430463455.us-central1.run.app"
-
 DUCKDB_FORMAT_STRING = "(FORMAT 'parquet', COMPRESSION 'zstd')"
 DUCKDB_MEMORY_LIMIT = "10GB"
 DUCKDB_MAX_SIZE = "500GB"

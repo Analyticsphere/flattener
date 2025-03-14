@@ -1,6 +1,6 @@
 import duckdb
 import uuid
-import constants
+import core.constants as constants
 from fsspec import filesystem  # type: ignore
 import logging
 import sys
