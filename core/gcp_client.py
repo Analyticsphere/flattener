@@ -61,7 +61,7 @@ def export_table_to_parquet(project_id: str, dataset_id: str, table_id: str, des
     """
     # Clear any exists files
     table_directory = f"{destination_bucket}/{table_id}"
-    utils.delete_from_gcs_path(table_directory)
+    delete_from_gcs_path(table_directory)
     
     # Build path to save Parquet file(s)
     destination_uri = f'gs://{table_directory}/{table_id}_part*.parquet'
