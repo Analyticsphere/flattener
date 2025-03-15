@@ -117,91 +117,91 @@ def create_flattening_select_statement(parque_path: str) -> str:
             DESCRIBE SELECT * FROM read_parquet('{parque_path}')
             """).fetchdf()
 
-            # Declare empty list to hold SELECT expressions
-            select_exprs = []
+    #         # Declare empty list to hold SELECT expressions
+    #         select_exprs = []
 
-            # Process each column in the schema
-            for _, row in schema.iterrows():
-                col_name = row['column_name']
-                col_type = row['column_type']
+    #         # Process each column in the schema
+    #         for _, row in schema.iterrows():
+    #             col_name = row['column_name']
+    #             col_type = row['column_type']
                 
-                # Skip ignored columns
-                if col_name in constants.IGNORE_FIELDS:
-                    continue
+    #             # Skip ignored columns
+    #             if col_name in constants.IGNORE_FIELDS:
+    #                 continue
                 
-                utils.logger.warning(f"------------------------------------------------------------------------")
-                utils.logger.warning(f"Processing column: {col_name}")
-                utils.logger.warning(f"Type: {col_type}")
+    #             utils.logger.warning(f"------------------------------------------------------------------------")
+    #             utils.logger.warning(f"Processing column: {col_name}")
+    #             utils.logger.warning(f"Type: {col_type}")
                 
-                # Extract all fields with their correct hierarchical paths
-                fields = extract_struct_fields(col_type, [col_name])
+    #             # Extract all fields with their correct hierarchical paths
+    #             fields = extract_struct_fields(col_type, [col_name])
                 
-                for field_type, field_path in fields:
-                    # Skip if any part of the path should be ignored
-                    if any(ignore in part for part in field_path for ignore in constants.IGNORE_FIELDS):
-                        continue
+    #             for field_type, field_path in fields:
+    #                 # Skip if any part of the path should be ignored
+    #                 if any(ignore in part for part in field_path for ignore in constants.IGNORE_FIELDS):
+    #                     continue
                     
-                    # Build SQL path with proper quoting
-                    sql_path = '.'.join([f'"{part}"' for part in field_path])
+    #                 # Build SQL path with proper quoting
+    #                 sql_path = '.'.join([f'"{part}"' for part in field_path])
                     
-                    # Build alias by joining path parts with underscores
-                    alias = '_'.join(field_path)
+    #                 # Build alias by joining path parts with underscores
+    #                 alias = '_'.join(field_path)
                     
-                    # Handle different field types
-                    if field_type == 'VARCHAR[]':
-                        utils.logger.warning(f"Processing VARCHAR[] field: {sql_path}")
+    #                 # Handle different field types
+    #                 if field_type == 'VARCHAR[]':
+    #                     utils.logger.warning(f"Processing VARCHAR[] field: {sql_path}")
                         
-                        # Query to get distinct values in the array used to build new columns
-                        distinct_vals_query = f"""
-                            WITH vals AS (
-                            SELECT DISTINCT UNNEST({sql_path}) AS val
-                            FROM read_parquet('{parque_path}')
-                            WHERE {sql_path} IS NOT NULL
-                            )
-                            SELECT * FROM vals WHERE TRY_CAST(val AS BIGINT) IS NOT NULL
-                        """
+    #                     # Query to get distinct values in the array used to build new columns
+    #                     distinct_vals_query = f"""
+    #                         WITH vals AS (
+    #                         SELECT DISTINCT UNNEST({sql_path}) AS val
+    #                         FROM read_parquet('{parque_path}')
+    #                         WHERE {sql_path} IS NOT NULL
+    #                         )
+    #                         SELECT * FROM vals WHERE TRY_CAST(val AS BIGINT) IS NOT NULL
+    #                     """
             
-                        try:
-                            # Execute the query to get distinct values
-                            distinct_vals = conn.execute(distinct_vals_query).fetchdf()['val'].tolist()
+    #                     try:
+    #                         # Execute the query to get distinct values
+    #                         distinct_vals = conn.execute(distinct_vals_query).fetchdf()['val'].tolist()
                             
-                            # For each distinct value, create a binary indicator column
-                            for val in distinct_vals:
-                                # Create a safe column name
-                                safe_val = re.sub(r'\W+', '_', str(val))
-                                new_col_name = f"{alias}_D_{safe_val}"
+    #                         # For each distinct value, create a binary indicator column
+    #                         for val in distinct_vals:
+    #                             # Create a safe column name
+    #                             safe_val = re.sub(r'\W+', '_', str(val))
+    #                             new_col_name = f"{alias}_D_{safe_val}"
                                 
-                                # Escape the value for SQL
-                                escaped_val = escape_sql_value(val)
+    #                             # Escape the value for SQL
+    #                             escaped_val = escape_sql_value(val)
                                 
-                                # Create expression for binary indicator (1 if array contains value, 0 otherwise)
-                                expr = f"CAST(IFNULL(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER), 0) AS STRING) AS \"{new_col_name}\""
-                                utils.logger.warning(f"Adding array indicator: {new_col_name}")
-                                select_exprs.append(expr)
-                        except Exception as e:
-                            utils.logger.warning(f"Error processing array field {sql_path}: {e}")
-                            # Fallback to including the array as-is
-                            select_expr = f"{sql_path} AS {alias}"
-                            utils.logger.warning(f"Adding field as-is: {select_expr}")
-                            select_exprs.append(select_expr)
-                    else:
-                        # For non-array fields, include them as-is
-                        select_expr = f"{sql_path} AS {alias}"
-                        utils.logger.warning(f"Adding field: {select_expr}")
-                        select_exprs.append(select_expr)
+    #                             # Create expression for binary indicator (1 if array contains value, 0 otherwise)
+    #                             expr = f"CAST(IFNULL(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER), 0) AS STRING) AS \"{new_col_name}\""
+    #                             utils.logger.warning(f"Adding array indicator: {new_col_name}")
+    #                             select_exprs.append(expr)
+    #                     except Exception as e:
+    #                         utils.logger.warning(f"Error processing array field {sql_path}: {e}")
+    #                         # Fallback to including the array as-is
+    #                         select_expr = f"{sql_path} AS {alias}"
+    #                         utils.logger.warning(f"Adding field as-is: {select_expr}")
+    #                         select_exprs.append(select_expr)
+    #                 else:
+    #                     # For non-array fields, include them as-is
+    #                     select_expr = f"{sql_path} AS {alias}"
+    #                     utils.logger.warning(f"Adding field: {select_expr}")
+    #                     select_exprs.append(select_expr)
                 
-                utils.logger.warning(f"------------------------------------------------------------------------")
+    #             utils.logger.warning(f"------------------------------------------------------------------------")
 
-            # Generate final SQL query
-            if select_exprs:
-                final_query = f"""
-    `                SELECT
-                    {', '.join(select_exprs)}
-                    FROM read_parquet('{parque_path}')`
-                """
+    #         # Generate final SQL query
+    #         if select_exprs:
+    #             final_query = f"""
+    # `                SELECT
+    #                 {', '.join(select_exprs)}
+    #                 FROM read_parquet('{parque_path}')`
+    #             """
 
-                utils.logger.warning(f"\n\nFinal query generated with {len(select_exprs)} fields\n\n")
-                return final_query
+    #             utils.logger.warning(f"\n\nFinal query generated with {len(select_exprs)} fields\n\n")
+    #             return final_query
     except Exception as e:
         utils.logger.error(f"Unable to process incoming Parquet file: {e}")
         raise Exception(f"Unable to process incoming Parquet file: {e}") from e
