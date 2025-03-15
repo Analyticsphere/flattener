@@ -4,7 +4,7 @@ import core.utils as utils
 import re
 
 def build_source_parquet_file_location(destination_bucket: str, table_name: str) -> str:
-    parquet_path = f"gs://{destination_bucket}/{table_name}/{table_name}*.parquet"
+    parquet_path = f"gs://{destination_bucket}/{table_name}/{table_name}part_*.parquet"
     return parquet_path
 
 
