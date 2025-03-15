@@ -4,7 +4,7 @@ import core.utils as utils
 import re
 
 def build_source_parquet_file_location(destination_bucket: str, table_name: str) -> str:
-    parquet_path = f"{destination_bucket}/{table_name}/{table_name}*.parquet"
+    parquet_path = f"gs://{destination_bucket}/{table_name}/{table_name}*.parquet"
     return parquet_path
 
 
@@ -112,9 +112,11 @@ def create_flattening_select_statement(parque_path: str) -> str:
 
     try:
         with conn:
+            # Get schema of Parquet file
             schema = conn.execute(f"""
             DESCRIBE SELECT * FROM read_parquet('{parque_path}')
             """).fetchdf()
+
             # Declare empty list to hold SELECT expressions
             select_exprs = []
 
@@ -149,7 +151,7 @@ def create_flattening_select_statement(parque_path: str) -> str:
                     if field_type == 'VARCHAR[]':
                         utils.logger.warning(f"Processing VARCHAR[] field: {sql_path}")
                         
-                        # Query to get distinct values in the array
+                        # Query to get distinct values in the array used to build new columns
                         distinct_vals_query = f"""
                             WITH vals AS (
                             SELECT DISTINCT UNNEST({sql_path}) AS val
