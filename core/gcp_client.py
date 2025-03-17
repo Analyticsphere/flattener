@@ -90,3 +90,28 @@ def table_to_parquet(project_id: str, dataset_id: str, table_id: str, destinatio
 def parquet_to_table(project_id: str, dataset_id: str, table_id: str, destination_bucket: str) -> None:
     parquet_file_path = utils.build_flattened_parquet_file_location(destination_bucket, table_id)
     utils.logger.warning(f"going to load {parquet_file_path} to {project_id}.{dataset_id}.{table_id}")
+    # gs://flattener_tmp_dev/participants/flattened/participants.parquet to nih-nci-dceg-connect-dev.FlatConnect.participants
+    
+    # Initialize BigQuery client
+    client = bigquery.Client(project=project_id)
+    
+    # Create a reference to the destination table
+    table_ref = client.dataset(dataset_id).table(table_id)
+    
+    # Configure the load job
+    job_config = bigquery.LoadJobConfig()
+    job_config.source_format = bigquery.SourceFormat.PARQUET
+    job_config.write_disposition = bigquery.WriteDisposition.WRITE_TRUNCATE
+    
+    # Start the load job
+    load_job = client.load_table_from_uri(
+        parquet_file_path,
+        table_ref,
+        job_config=job_config
+    )
+    
+    # Wait for the job to complete
+    load_job.result()
+    
+    # Log success message
+    utils.logger.info(f"Successfully loaded {parquet_file_path} to {project_id}.{dataset_id}.{table_id}")
