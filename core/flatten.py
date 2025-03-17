@@ -215,7 +215,8 @@ def flatten_table(destination_bucket: str, project_id: str, dataset_id: str, tab
     source_parquet_path = build_source_parquet_file_location(destination_bucket, table_name)
     utils.logger.warning(f"looking for files ins {source_parquet_path}")
     select_statement = create_flattening_select_statement(source_parquet_path)
-    select_no_return = select_statement.replace('\n', ' ')
-    utils.logger.warning(f"\n**** Final select statement is **** \n {select_no_return}")
+    utils.logger.warning(f"did run create_flattening_select_statement!!!")
+    #select_no_return = select_statement.replace('\n', ' ')
+    #utils.logger.warning(f"\n**** Final select statement is **** \n {select_no_return}")
 
     utils.logger.warning()
