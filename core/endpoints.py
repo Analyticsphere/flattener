@@ -33,7 +33,7 @@ def bq_to_parquet() -> tuple[str, int]:
 
     try:
         utils.logger.info(f"Extracting {table_id} to {destination_bucket}")
-        gcp_client.export_table_to_parquet(project_id, dataset_id, table_id, destination_bucket)
+        gcp_client.table_to_parquet(project_id, dataset_id, table_id, destination_bucket)
         return f"Extracted {table_id} to Parquet", 200
     except Exception as e:
         utils.logger.error(f"Unable to extract BigQuery table {table_id} to Parquet: {str(e)}")
@@ -56,6 +56,25 @@ def flatten_parquet() -> tuple[str, int]:
     except Exception as e:
         utils.logger.error(f"Unable to flatten {table_id} Parquet files: {str(e)}")
         return f"Unable to flatten {table_id} Parquet files: {str(e)}", 500
+
+@app.route('/parquet_to_table', methods=['POST'])
+def bq_to_parquet() -> tuple[str, int]:
+    data: dict[str, Any] = request.get_json() or {}
+    project_id: Optional[str] = data.get('project_id')
+    dataset_id: Optional[str] = data.get('dataset_id')
+    table_id: Optional[str] = data.get('table_id')
+    destination_bucket: Optional[str] = data.get('destination_bucket')
+
+    if not project_id or not dataset_id or not table_id or not destination_bucket:
+        return "Missing required parameters: project_id, dataset_id, table_id, destination_bucket", 400
+
+    try:
+        utils.logger.info(f"Moving {table_id} Parquet file into BigQuery")
+        gcp_client.table_to_parquet(project_id, dataset_id, table_id, destination_bucket)
+        return f"Moved {table_id} Parquet file to BigQuery", 200
+    except Exception as e:
+        utils.logger.error(f"Unable to move {table_id} Parquet to BigQuery: {str(e)}")
+        return f"Unable to move {table_id} Parquet to BigQuery: {str(e)}", 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

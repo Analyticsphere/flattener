@@ -49,7 +49,7 @@ def delete_from_gcs_path(gcs_path: str) -> None:
     except Exception as e:
         print(f"Error deleting files: {str(e)}")
 
-def export_table_to_parquet(project_id: str, dataset_id: str, table_id: str, destination_bucket: str):
+def table_to_parquet(project_id: str, dataset_id: str, table_id: str, destination_bucket: str) -> None:
     """
     Export a BigQuery table to Parquet file(s) in a GCS bucket.
     
@@ -86,6 +86,7 @@ def export_table_to_parquet(project_id: str, dataset_id: str, table_id: str, des
     
     # Wait for the job to complete
     extract_job.result()
-    
-    print(f"Export job completed: {extract_job.job_id}")
-    print(f"Exported data to: {destination_uri}")
+
+def parquet_to_table(project_id: str, dataset_id: str, table_id: str, destination_bucket: str) -> None:
+    parquet_file_path = utils.build_flattened_parquet_file_location(destination_bucket, table_id)
+    utils.logger.warning(f"going to load {parquet_file_path} to {project_id}.{dataset_id}.{table_id}")
