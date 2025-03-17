@@ -39,6 +39,8 @@ def create_duckdb_connection() -> tuple[duckdb.DuckDBPyConnection, str]:
         # https://duckdb.org/docs/configuration/overview.html#global-configuration-options
         conn.execute(f"SET threads={constants.DUCKDB_THREADS}")
 
+        conn.execute("FORCE INSTALL httpfs")
+
         # Set max size to allow on disk
         # Unneeded when writing to GCS
         # conn.execute(f"SET max_temp_directory_size='{constants.DUCKDB_MAX_SIZE}'")
