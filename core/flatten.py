@@ -116,7 +116,7 @@ def create_flattening_select_statement(parque_path: str) -> str:
             # schema = conn.execute(f"""
             # DESCRIBE SELECT * FROM read_parquet('{parque_path}')
             # """).fetchdf()
-            conn.execute(f"SELECT * FROM read_parquet('{parque_path}')")
+            conn.execute(f"DESCRIBE SELECT * FROM read_parquet('{parque_path}') LIMIT 0")
 
     #         # Declare empty list to hold SELECT expressions
     #         select_exprs = []
@@ -218,5 +218,3 @@ def flatten_table(destination_bucket: str, project_id: str, dataset_id: str, tab
     utils.logger.warning(f"did run create_flattening_select_statement!!!")
     #select_no_return = select_statement.replace('\n', ' ')
     #utils.logger.warning(f"\n**** Final select statement is **** \n {select_no_return}")
-
-    utils.logger.warning()
