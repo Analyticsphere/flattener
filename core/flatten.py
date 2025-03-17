@@ -1,28 +1,32 @@
-
 import core.constants as constants
 import core.utils as utils
 import re
 
-def build_source_parquet_file_location(destination_bucket: str, table_name: str) -> str:
-    parquet_path = f"gs://{destination_bucket}/{table_name}/{table_name}_part*.parquet"
-    return parquet_path
+def flatten_table_file(destination_bucket: str, table_name: str) -> None:
+    # Generate a SQL statement that "flattens" a Parquet file and then execute it to create a new file
+    source_parquet_path = utils.build_source_parquet_file_location(destination_bucket, table_name)
+    flattened_file_path = utils.build_flattened_parquet_file_location(destination_bucket, table_name)
 
-def build_flattened_parquet_file_location(destination_bucket: str, table_name: str) -> str:
-    parquet_path = f"gs://{destination_bucket}/{table_name}/flattened/{table_name}.parquet"
-    return parquet_path
+    # Build the SELECT statement
+    select_statement = create_flattening_select_statement(source_parquet_path)
 
-# def find_matching_closing_paren(text, start_pos):
-#     """Find the matching closing parenthesis"""
-#     level = 1
-#     for i in range(start_pos + 1, len(text)):
-#         if text[i] == '(':
-#             level += 1
-#         elif text[i] == ')':
-#             level -= 1
-#             if level == 0:
-#                 return i
-#     return -1
+    if select_statement:
+        final_query = f"""
+        COPY (
+            {select_statement}
+        ) TO '{flattened_file_path}' {constants.DUCKDB_FORMAT_STRING};
+        """
 
+        conn, local_db_file = utils.create_duckdb_connection()
+
+        try:
+            with conn:
+                conn.execute(final_query)
+        except Exception as e:
+            utils.logger.error(f"Unable to execute flattening SQL: {e}")
+            raise Exception(f"Unable to execute flattening SQL: {e}") from e
+        finally:
+            utils.close_duckdb_connection(conn, local_db_file)
 
 def extract_struct_fields(schema_str, parent_path=[]):
     """
@@ -101,12 +105,11 @@ def extract_struct_fields(schema_str, parent_path=[]):
     
     return result
 
-# Safely escape values for SQL
 def escape_sql_value(val):
+    # Safely escape values for SQL
     if val is None:
         return "NULL"
     return str(val).replace("\\", "\\\\").replace("'", "''").replace('"', '\\"')
-
 
 def create_flattening_select_statement(parque_path: str) -> str:
     # Create a SQL SELECT statement that, when exected, "expands" a nested Parquet file
@@ -200,33 +203,3 @@ def create_flattening_select_statement(parque_path: str) -> str:
     finally:
         utils.close_duckdb_connection(conn, local_db_file)
 
-
-def flatten_table_file(destination_bucket: str, project_id: str, dataset_id: str, table_name: str) -> None:
-    utils.logger.warning(f"flattening parquets in table {destination_bucket}")
-    source_parquet_path = build_source_parquet_file_location(destination_bucket, table_name)
-    utils.logger.warning(f"looking for files ins {source_parquet_path}")
-    select_statement = create_flattening_select_statement(source_parquet_path)
-    utils.logger.warning(f"did run create_flattening_select_statement!!!")
-    #select_no_return = select_statement.replace('\n', ' ')
-    #utils.logger.warning(f"\n**** Final select statement is **** \n {select_no_return}")
-    flattened_file_path = build_flattened_parquet_file_location(destination_bucket, table_name)
-    if select_statement:
-        final_query = f"""
-        COPY (
-            {select_statement}
-        ) TO '{flattened_file_path}' {constants.DUCKDB_FORMAT_STRING};
-        """
-        query_no_return = final_query.replace('\n','')
-        utils.logger.warning(f"-*-*-*-*-* final query is {query_no_return}")
-        conn, local_db_file = utils.create_duckdb_connection()
-
-        try:
-            with conn:
-                conn.execute(final_query)
-
-                utils.logger.warning(f"**** the flattened file is created!! ****")
-        except Exception as e:
-            utils.logger.error(f"Unable to execute flattening SQL: {e}")
-            raise Exception(f"Unable to execute flattening SQL: {e}") from e
-        finally:
-            utils.close_duckdb_connection(conn, local_db_file)      

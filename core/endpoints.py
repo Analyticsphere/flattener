@@ -43,17 +43,15 @@ def bq_to_parquet() -> tuple[str, int]:
 def flatten_parquet() -> tuple[str, int]:
     data: dict[str, Any] = request.get_json() or {}
     destination_bucket: Optional[str] = data.get('destination_bucket')
-    project_id: Optional[str] = data.get('project_id')
-    dataset_id: Optional[str] = data.get('dataset_id')
     table_id: Optional[str] = data.get('table_id')
     
-    if not project_id or not dataset_id or not table_id or not destination_bucket:
-        return "Missing required parameters: project_id, dataset_id, table_id, destination_bucket", 400
+    if not table_id or not destination_bucket:
+        return "Missing required parameters: table_id, destination_bucket", 400
 
     try:
         utils.logger.info(f"Flattening {table_id} Parquet files")
 
-        flatten.flatten_table_file(destination_bucket, project_id, dataset_id, table_id)
+        flatten.flatten_table_file(destination_bucket, table_id)
         return f"Flattened {table_id} Parquet files", 200
     except Exception as e:
         utils.logger.error(f"Unable to flatten {table_id} Parquet files: {str(e)}")

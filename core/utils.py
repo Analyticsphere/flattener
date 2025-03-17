@@ -66,3 +66,10 @@ def close_duckdb_connection(conn: duckdb.DuckDBPyConnection, local_db_file: str)
     except Exception as e:
         logger.error(f"Unable to close DuckDB connection: {e}")
 
+def build_source_parquet_file_location(destination_bucket: str, table_name: str) -> str:
+    parquet_path = f"gs://{destination_bucket}/{table_name}/{table_name}_part*.parquet"
+    return parquet_path
+
+def build_flattened_parquet_file_location(destination_bucket: str, table_name: str) -> str:
+    parquet_path = f"gs://{destination_bucket}/{table_name}/flattened/{table_name}.parquet"
+    return parquet_path
