@@ -118,8 +118,9 @@ def create_flattening_select_statement(parque_path: str) -> str:
             # """).fetchdf()
 
             # Get schema of Parquet file
+            # pandas must be installed, but doesn't need to be imported, for fetchdf() to work
             schema = conn.execute(f"DESCRIBE SELECT * FROM read_parquet('{parque_path}') LIMIT 0").fetchdf()#.fetchall()
-            utils.logger.warning(f"the schema is: {schema}")
+            #utils.logger.warning(f"the schema is: {schema}")
 
             # Declare empty list to hold SELECT expressions
             select_exprs = []
@@ -133,9 +134,9 @@ def create_flattening_select_statement(parque_path: str) -> str:
                 if col_name in constants.IGNORE_FIELDS:
                     continue
                 
-                utils.logger.warning(f"------------------------------------------------------------------------")
-                utils.logger.warning(f"Processing column: {col_name}")
-                utils.logger.warning(f"Type: {col_type}")
+                #utils.logger.warning(f"------------------------------------------------------------------------")
+                #utils.logger.warning(f"Processing column: {col_name}")
+                #utils.logger.warning(f"Type: {col_type}")
                 
                 # Extract all fields with their correct hierarchical paths
                 fields = extract_struct_fields(col_type, [col_name])
@@ -153,7 +154,7 @@ def create_flattening_select_statement(parque_path: str) -> str:
                     
                     # Handle different field types
                     if field_type == 'VARCHAR[]':
-                        utils.logger.warning(f"Processing VARCHAR[] field: {sql_path}")
+                        #utils.logger.warning(f"Processing VARCHAR[] field: {sql_path}")
                         
                         # Query to get distinct values in the array used to build new columns
                         distinct_vals_query = f"""
@@ -180,18 +181,18 @@ def create_flattening_select_statement(parque_path: str) -> str:
                                 
                                 # Create expression for binary indicator (1 if array contains value, 0 otherwise)
                                 expr = f"CAST(IFNULL(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER), 0) AS STRING) AS \"{new_col_name}\""
-                                utils.logger.warning(f"Adding array indicator: {new_col_name}")
+                                #utils.logger.warning(f"Adding array indicator: {new_col_name}")
                                 select_exprs.append(expr)
                         except Exception as e:
-                            utils.logger.warning(f"Error processing array field {sql_path}: {e}")
+                            #utils.logger.warning(f"Error processing array field {sql_path}: {e}")
                             # Fallback to including the array as-is
                             select_expr = f"{sql_path} AS {alias}"
-                            utils.logger.warning(f"Adding field as-is: {select_expr}")
+                            #utils.logger.warning(f"Adding field as-is: {select_expr}")
                             select_exprs.append(select_expr)
                     else:
                         # For non-array fields, include them as-is
                         select_expr = f"{sql_path} AS {alias}"
-                        utils.logger.warning(f"Adding field: {select_expr}")
+                        #utils.logger.warning(f"Adding field: {select_expr}")
                         select_exprs.append(select_expr)
                 
                 utils.logger.warning(f"------------------------------------------------------------------------")
