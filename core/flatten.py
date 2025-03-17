@@ -118,8 +118,7 @@ def create_flattening_select_statement(parque_path: str) -> str:
             # """).fetchdf()
 
             # Get schema of Parquet file
-            # Without LIMIT 0, DESCRIBE causes an SIGSEGV error when reading Parquet files in GCS
-            schema = conn.execute(f"DESCRIBE SELECT * FROM read_parquet('{parque_path}') LIMIT 0")#.fetchdf()
+            schema = conn.execute(f"DESCRIBE SELECT * FROM read_parquet('{parque_path}') LIMIT 0").fetchall()
             utils.logger.warning(f"the schema is: {schema}")
 
     #         # Declare empty list to hold SELECT expressions
