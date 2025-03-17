@@ -216,7 +216,8 @@ def flatten_table_file(destination_bucket: str, project_id: str, dataset_id: str
             {select_statement}
         ) TO '{flattened_file_path}' {constants.DUCKDB_FORMAT_STRING};
         """
-
+        query_no_return = final_query.replace('\n','')
+        utils.logger.warning(f"-*-*-*-*-* final query is {query_no_return}")
         conn, local_db_file = utils.create_duckdb_connection()
 
         try:
