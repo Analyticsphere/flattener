@@ -7,6 +7,9 @@ def build_source_parquet_file_location(destination_bucket: str, table_name: str)
     parquet_path = f"gs://{destination_bucket}/{table_name}/{table_name}_part*.parquet"
     return parquet_path
 
+def build_flattened_parquet_file_location(destination_bucket: str, table_name: str) -> str:
+    parquet_path = f"gs://{destination_bucket}/{table_name}/flattened/{table_name}.parquet"
+    return parquet_path
 
 def find_matching_closing_paren(text, start_pos):
     """Find the matching closing parenthesis"""
