@@ -53,7 +53,7 @@ def flatten_parquet() -> tuple[str, int]:
     try:
         utils.logger.info(f"Flattening {table_id} Parquet files")
 
-        flatten.flatten_table(destination_bucket, project_id, dataset_id, table_id)
+        flatten.flatten_table_file(destination_bucket, project_id, dataset_id, table_id)
         return f"Flattened {table_id} Parquet files", 200
     except Exception as e:
         utils.logger.error(f"Unable to flatten {table_id} Parquet files: {str(e)}")

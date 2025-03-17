@@ -11,17 +11,17 @@ def build_flattened_parquet_file_location(destination_bucket: str, table_name: s
     parquet_path = f"gs://{destination_bucket}/{table_name}/flattened/{table_name}.parquet"
     return parquet_path
 
-def find_matching_closing_paren(text, start_pos):
-    """Find the matching closing parenthesis"""
-    level = 1
-    for i in range(start_pos + 1, len(text)):
-        if text[i] == '(':
-            level += 1
-        elif text[i] == ')':
-            level -= 1
-            if level == 0:
-                return i
-    return -1
+# def find_matching_closing_paren(text, start_pos):
+#     """Find the matching closing parenthesis"""
+#     level = 1
+#     for i in range(start_pos + 1, len(text)):
+#         if text[i] == '(':
+#             level += 1
+#         elif text[i] == ')':
+#             level -= 1
+#             if level == 0:
+#                 return i
+#     return -1
 
 
 def extract_struct_fields(schema_str, parent_path=[]):
@@ -116,14 +116,8 @@ def create_flattening_select_statement(parque_path: str) -> str:
     try:
         with conn:
             # Get schema of Parquet file
-            # schema = conn.execute(f"""
-            # DESCRIBE SELECT * FROM read_parquet('{parque_path}')
-            # """).fetchdf()
-
-            # Get schema of Parquet file
             # pandas must be installed, but doesn't need to be imported, for fetchdf() to work
-            schema = conn.execute(f"DESCRIBE SELECT * FROM read_parquet('{parque_path}') LIMIT 0").fetchdf()#.fetchall()
-            #utils.logger.warning(f"the schema is: {schema}")
+            schema = conn.execute(f"DESCRIBE SELECT * FROM read_parquet('{parque_path}') LIMIT 0").fetchdf()
 
             # Declare empty list to hold SELECT expressions
             select_exprs = []
@@ -136,11 +130,7 @@ def create_flattening_select_statement(parque_path: str) -> str:
                 # Skip ignored columns
                 if col_name in constants.IGNORE_FIELDS:
                     continue
-                
-                #utils.logger.warning(f"------------------------------------------------------------------------")
-                #utils.logger.warning(f"Processing column: {col_name}")
-                #utils.logger.warning(f"Type: {col_type}")
-                
+                                
                 # Extract all fields with their correct hierarchical paths
                 fields = extract_struct_fields(col_type, [col_name])
                 
@@ -156,10 +146,9 @@ def create_flattening_select_statement(parque_path: str) -> str:
                     alias = '_'.join(field_path)
                     
                     # Handle different field types
-                    if field_type == 'VARCHAR[]':
-                        #utils.logger.warning(f"Processing VARCHAR[] field: {sql_path}")
-                        
+                    if field_type == 'VARCHAR[]':                        
                         # Query to get distinct values in the array used to build new columns
+                        # Include the check for interger values so free-text survery responses don't get created as a column
                         distinct_vals_query = f"""
                             WITH vals AS (
                             SELECT DISTINCT UNNEST({sql_path}) AS val
@@ -184,22 +173,16 @@ def create_flattening_select_statement(parque_path: str) -> str:
                                 
                                 # Create expression for binary indicator (1 if array contains value, 0 otherwise)
                                 expr = f"CAST(IFNULL(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER), 0) AS STRING) AS \"{new_col_name}\""
-                                #utils.logger.warning(f"Adding array indicator: {new_col_name}")
                                 select_exprs.append(expr)
                         except Exception as e:
-                            #utils.logger.warning(f"Error processing array field {sql_path}: {e}")
                             # Fallback to including the array as-is
                             select_expr = f"{sql_path} AS {alias}"
-                            #utils.logger.warning(f"Adding field as-is: {select_expr}")
                             select_exprs.append(select_expr)
                     else:
                         # For non-array fields, include them as-is
                         select_expr = f"{sql_path} AS {alias}"
-                        #utils.logger.warning(f"Adding field: {select_expr}")
                         select_exprs.append(select_expr)
                 
-                utils.logger.warning(f"------------------------------------------------------------------------")
-
             # Generate final SQL query
             if select_exprs:
                 final_query = f"""
@@ -210,6 +193,7 @@ def create_flattening_select_statement(parque_path: str) -> str:
 
                 utils.logger.warning(f"\n\nFinal query generated with {len(select_exprs)} fields\n\n")
                 return final_query
+            
     except Exception as e:
         utils.logger.error(f"Unable to process incoming Parquet file: {e}")
         raise Exception(f"Unable to process incoming Parquet file: {e}") from e
@@ -217,11 +201,31 @@ def create_flattening_select_statement(parque_path: str) -> str:
         utils.close_duckdb_connection(conn, local_db_file)
 
 
-def flatten_table(destination_bucket: str, project_id: str, dataset_id: str, table_name: str) -> None:
+def flatten_table_file(destination_bucket: str, project_id: str, dataset_id: str, table_name: str) -> None:
     utils.logger.warning(f"flattening parquets in table {destination_bucket}")
     source_parquet_path = build_source_parquet_file_location(destination_bucket, table_name)
     utils.logger.warning(f"looking for files ins {source_parquet_path}")
     select_statement = create_flattening_select_statement(source_parquet_path)
     utils.logger.warning(f"did run create_flattening_select_statement!!!")
-    select_no_return = select_statement.replace('\n', ' ')
-    utils.logger.warning(f"\n**** Final select statement is **** \n {select_no_return}")
+    #select_no_return = select_statement.replace('\n', ' ')
+    #utils.logger.warning(f"\n**** Final select statement is **** \n {select_no_return}")
+    flattened_file_path = build_flattened_parquet_file_location(destination_bucket, table_name)
+    if select_statement:
+        final_query = f"""
+        COPY (
+            {select_statement}
+        ) TO '{flattened_file_path}' {constants.DUCKDB_FORMAT_STRING};
+        """
+
+        conn, local_db_file = utils.create_duckdb_connection()
+
+        try:
+            with conn:
+                conn.execute(final_query)
+
+                utils.logger.warning(f"**** the flattened file is created!! ****")
+        except Exception as e:
+            utils.logger.error(f"Unable to execute flattening SQL: {e}")
+            raise Exception(f"Unable to execute flattening SQL: {e}") from e
+        finally:
+            utils.close_duckdb_connection(conn, local_db_file)      
