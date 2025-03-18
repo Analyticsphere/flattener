@@ -3,6 +3,7 @@ import core.constants as constants
 import core.utils as utils
 from google.cloud import storage, pubsub_v1
 from typing import Optional
+import json
 
 def parse_gcs_path(gcs_path: str) -> tuple[str, str]:
     """
@@ -128,10 +129,14 @@ def publish_pubsub_message(project_id: str, topic: str, data: Optional[dict]) ->
     topic_path = publisher.topic_path(project_id, topic)
 
     # Data must be a bytestring
-    data = {}
+    if data is None:
+        data = {}
+    
+    # Convert the dictionary to a JSON string, then encode to bytes
+    data_bytes = json.dumps(data).encode("utf-8")
 
     # Publish the message
-    future = publisher.publish(topic_path, data)
+    future = publisher.publish(topic_path, data_bytes)
 
-    # Wait for Google to knowledge receipt of the pubsub message 
+    # Wait for Google to acknowledge receipt of the pubsub message 
     _ = future.result()
