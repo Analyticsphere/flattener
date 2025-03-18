@@ -141,5 +141,7 @@ def publish_pubsub_message(project_id: str, topic: str, data: Optional[dict]) ->
 
         # Wait for Google to acknowledge receipt of the pubsub message 
         _ = future.result()
+
+        utils.logger.info(f"Published PubSub message on topic {topic} to {project_id}")
     except Exception as e:
         raise Exception(f"Unable to publish PubSub message: {str(e)}")
