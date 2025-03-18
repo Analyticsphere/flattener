@@ -122,21 +122,24 @@ def parquet_to_table(project_id: str, dataset_id: str, table_id: str, destinatio
         utils.logger.warning(f"Parquet file {parquet_file_path} not found, did not load to BigQuery")
     
 def publish_pubsub_message(project_id: str, topic: str, data: Optional[dict]) -> None:
-    # Create a publisher client
-    publisher = pubsub_v1.PublisherClient()
+    try:
+        # Create a publisher client
+        publisher = pubsub_v1.PublisherClient()
 
-    # The topic path follows this format: projects/{project_id}/topics/{topic_id}
-    topic_path = publisher.topic_path(project_id, topic)
+        # The topic path follows this format: projects/{project_id}/topics/{topic_id}
+        topic_path = publisher.topic_path(project_id, topic)
 
-    # Data must be a bytestring
-    if data is None:
-        data = {}
-    
-    # Convert the dictionary to a JSON string, then encode to bytes
-    data_bytes = json.dumps(data).encode("utf-8")
+        # Data must be a bytestring
+        if data is None:
+            data = {}
+        
+        # Convert the dictionary to a JSON string, then encode to bytes
+        data_bytes = json.dumps(data).encode("utf-8")
 
-    # Publish the message
-    future = publisher.publish(topic_path, data_bytes)
+        # Publish the message
+        future = publisher.publish(topic_path, data_bytes)
 
-    # Wait for Google to acknowledge receipt of the pubsub message 
-    _ = future.result()
+        # Wait for Google to acknowledge receipt of the pubsub message 
+        _ = future.result()
+    except Exception as e:
+        raise Exception(f"Unable to publish PubSub message: {str(e)}")
