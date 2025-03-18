@@ -31,7 +31,7 @@ def refresh_firestore_data() -> tuple[str, int]:
 
     try:
         utils.logger.info(f"Backing up and refreshing Firestore data")
-        gcp_client.publish_pubsub_message(project_id, topic)
+        gcp_client.publish_pubsub_message(project_id, topic, None)
         return f"Backed up and refreshed Firestore", 200
     except Exception as e:
         utils.logger.error(f"Unable to backup Firestore: {str(e)}")
