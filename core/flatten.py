@@ -194,7 +194,6 @@ def create_flattening_select_statement(parque_path: str) -> str:
                     FROM read_parquet('{parque_path}')
                 """
 
-                utils.logger.warning(f"\n\nFinal query generated with {len(select_exprs)} fields\n\n")
                 return final_query
             
     except Exception as e:
