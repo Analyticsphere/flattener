@@ -20,6 +20,23 @@ def heartbeat() -> tuple[Any, int]:
         'service': constants.SERVICE_NAME
     }), 200
 
+@app.route('/refresh_firestore', methods=['POST'])
+def refresh_firestore_data() -> tuple[str, int]:
+    data: dict[str, Any] = request.get_json() or {}
+    project_id: Optional[str] = data.get('project_id')
+    topic: Optional[str] = data.get('topic')
+
+    if not project_id or not topic:
+        return "Missing required parameters: project_id, dataset_id", 400
+
+    try:
+        utils.logger.info(f"Backing up and refreshing Firestore data")
+        gcp_client.publish_pubsub_message(project_id, topic)
+        return f"Backed up and refreshed Firestore", 200
+    except Exception as e:
+        utils.logger.error(f"Unable to backup Firestore: {str(e)}")
+        return f"Unable to backup Firestore: {str(e)}", 500
+
 @app.route('/table_to_parquet', methods=['POST'])
 def bq_to_parquet() -> tuple[str, int]:
     data: dict[str, Any] = request.get_json() or {}

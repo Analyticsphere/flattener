@@ -1,8 +1,8 @@
 from google.cloud import bigquery
 import core.constants as constants
 import core.utils as utils
-from google.cloud import storage
-
+from google.cloud import storage, pubsub_v1
+from typing import Optional
 
 def parse_gcs_path(gcs_path: str) -> tuple[str, str]:
     """
@@ -120,3 +120,18 @@ def parquet_to_table(project_id: str, dataset_id: str, table_id: str, destinatio
     else:
         utils.logger.warning(f"Parquet file {parquet_file_path} not found, did not load to BigQuery")
     
+def publish_pubsub_message(project_id: str, topic: str, data: Optional[dict]) -> None:
+    # Create a publisher client
+    publisher = pubsub_v1.PublisherClient()
+
+    # The topic path follows this format: projects/{project_id}/topics/{topic_id}
+    topic_path = publisher.topic_path(project_id, topic)
+
+    # Data must be a bytestring
+    data = {}
+
+    # Publish the message
+    future = publisher.publish(topic_path, data)
+
+    # Wait for Google to knowledge receipt of the pubsub message 
+    _ = future.result()
