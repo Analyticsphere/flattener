@@ -1,3 +1,5 @@
+from enum import Enum
+
 SERVICE_NAME = "flattener"
 
 EXPORT_PARQUET_COMPRESSION="snappy"
@@ -13,3 +15,6 @@ IGNORE_FIELDS = [
     'D_726699695_V2', 'Module2', 'undefined', 'key', 'query', 'D_726699695','D_299215535',
     'D_166676176', 'd_110349197', 'd_543608829'
 ]
+
+class SPECIAL_LOGIC_FIELDS(str, Enum):
+    D_470862706 = "D_470862706"
