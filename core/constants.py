@@ -16,5 +16,6 @@ IGNORE_FIELDS = [
     'D_166676176', 'd_110349197', 'd_543608829'
 ]
 
+# Helps keep track of the fields with one-off/special handling
 class SPECIAL_LOGIC_FIELDS(str, Enum):
     D_470862706 = "D_470862706"

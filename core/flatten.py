@@ -143,18 +143,19 @@ def create_flattening_select_statement(parque_path: str) -> str:
                     if any(ignore in part for part in field_path for ignore in constants.IGNORE_FIELDS):
                         continue
 
+
+
                     # DuckDB struggles to parse D_470862706
                     # The field is an array, and the second item in the array is a struct
                     # Without specifing the struct object in the array directly, DuckDB can't read the struct
                     if field_path[0] == constants.SPECIAL_LOGIC_FIELDS.D_470862706.value:
                         D_470862706_field_path = f"{constants.SPECIAL_LOGIC_FIELDS.D_470862706.value}[1]"
                         field_path[0] = D_470862706_field_path
+                        sql_path = '.'.join([f'{part}' for part in field_path])
 
                     # Build SQL path with proper quoting
-                    if field_path[0] == D_470862706_field_path:
-                        sql_path = '.'.join([f'{part}' for part in field_path])
-                    else:
-                        sql_path = '.'.join([f'"{part}"' for part in field_path])
+                    sql_path = '.'.join([f'"{part}"' for part in field_path])
+                        
                     
                     # Build alias by joining path parts with underscores
                     alias = '_'.join(field_path)
