@@ -41,11 +41,8 @@ def create_duckdb_connection() -> tuple[duckdb.DuckDBPyConnection, str]:
         # https://duckdb.org/docs/configuration/overview.html#global-configuration-options
         conn.execute(f"SET threads={constants.DUCKDB_THREADS}")
 
-        #conn.execute("FORCE INSTALL httpfs")
-
-        # Set max size to allow on disk
-        # Unneeded when writing to GCS
-        # conn.execute(f"SET max_temp_directory_size='{constants.DUCKDB_MAX_SIZE}'")
+        # Set max disk space to allow on GCS
+        conn.execute(f"SET max_temp_directory_size='{constants.DUCKDB_MAX_SIZE}'")
 
         # Register GCS filesystem to read/write to GCS buckets
         conn.register_filesystem(filesystem('gcs'))
@@ -68,11 +65,11 @@ def close_duckdb_connection(conn: duckdb.DuckDBPyConnection, local_db_file: str)
     except Exception as e:
         logger.error(f"Unable to close DuckDB connection: {e}")
 
-def build_source_parquet_file_location(destination_bucket: str, table_name: str) -> str:
+def get_raw_parquet_file_location(destination_bucket: str, table_name: str) -> str:
     parquet_path = f"gs://{destination_bucket}/{table_name}/{table_name}_part*.parquet"
     return parquet_path
 
-def build_flattened_parquet_file_location(destination_bucket: str, table_name: str) -> str:
+def get_flattened_parquet_file_location(destination_bucket: str, table_name: str) -> str:
     parquet_path = f"gs://{destination_bucket}/{table_name}/flattened/{table_name}.parquet"
     return parquet_path
 

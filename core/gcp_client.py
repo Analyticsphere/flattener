@@ -60,12 +60,12 @@ def table_to_parquet(project_id: str, dataset_id: str, table_id: str, destinatio
         table_id (str): BigQuery table ID to be flattened
         destination_uri (str): GCS destination bucket (e.g., 'bucket-name/path/')
     """
-    # Clear any exists files
+    # Clear any existing files
     table_directory = f"{destination_bucket}/{table_id}"
     delete_from_gcs_path(table_directory)
     
     # Build path to save Parquet file(s)
-    destination_uri = f'gs://{table_directory}/{table_id}_part*.parquet'
+    destination_uri = utils.get_raw_parquet_file_location(destination_bucket, table_id)#f'gs://{table_directory}/{table_id}_part*.parquet'
 
     # Initialize BigQuery client
     client = bigquery.Client(project=project_id)
@@ -89,7 +89,7 @@ def table_to_parquet(project_id: str, dataset_id: str, table_id: str, destinatio
     extract_job.result()
 
 def parquet_to_table(project_id: str, dataset_id: str, table_id: str, destination_bucket: str) -> None:
-    parquet_file_path = utils.build_flattened_parquet_file_location(destination_bucket, table_id)
+    parquet_file_path = utils.get_flattened_parquet_file_location(destination_bucket, table_id)
 
     if utils.parquet_file_exists(parquet_file_path):
         if utils.valid_parquet_file(parquet_file_path):

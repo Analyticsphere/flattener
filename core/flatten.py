@@ -4,8 +4,8 @@ import re
 
 def flatten_table_file(destination_bucket: str, table_name: str) -> None:
     # Generate a SQL statement that "flattens" a Parquet file and then execute it to create a new file
-    source_parquet_path = utils.build_source_parquet_file_location(destination_bucket, table_name)
-    flattened_file_path = utils.build_flattened_parquet_file_location(destination_bucket, table_name)
+    source_parquet_path = utils.get_raw_parquet_file_location(destination_bucket, table_name)
+    flattened_file_path = utils.get_flattened_parquet_file_location(destination_bucket, table_name)
 
     # Build the SELECT statement
     select_statement = create_flattening_select_statement(source_parquet_path)
