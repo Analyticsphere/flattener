@@ -159,6 +159,9 @@ def create_flattening_select_statement(parque_path: str) -> str:
                     
                     # Build alias by joining path parts with underscores
                     alias = '_'.join(field_path)
+
+                    # Remove [] from alias
+                    alias = alias.replace('[','',).replace(']','')
                     
                     # Handle different field types
                     if field_type == 'VARCHAR[]':                        
