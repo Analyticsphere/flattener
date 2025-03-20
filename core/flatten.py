@@ -1,6 +1,8 @@
+import re
+
 import core.constants as constants
 import core.utils as utils
-import re
+
 
 def flatten_table_file(destination_bucket: str, table_name: str) -> None:
     # Generate a SQL statement that "flattens" a Parquet file and then execute it to create a new file
@@ -114,6 +116,7 @@ def escape_sql_value(val):
 
 def create_flattening_select_statement(parquet_path: str) -> str:
     # Create a SQL SELECT statement that, when exected, "expands" a nested Parquet file
+    # All fields must be of type STRING per analyst requirements
 
     conn, local_db_file = utils.create_duckdb_connection()
 
@@ -142,8 +145,6 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                     # Skip if any part of the path should be ignored
                     if any(ignore in part for part in field_path for ignore in constants.IGNORE_FIELDS):
                         continue
-
-
 
                     # DuckDB struggles to parse D_470862706
                     # The field is an array, and the second item in the array is a struct

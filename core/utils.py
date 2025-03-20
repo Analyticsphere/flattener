@@ -1,12 +1,13 @@
-import duckdb
-import uuid
-import core.constants as constants
-from fsspec import filesystem  # type: ignore
 import logging
-import sys
 import os
+import sys
+import uuid
+
+import duckdb
+from fsspec import filesystem  # type: ignore
 from google.cloud import storage  # type: ignore
 
+import core.constants as constants
 
 """
 Set up a logging instance that will write to stdout (and therefor show up in Google Cloud logs)

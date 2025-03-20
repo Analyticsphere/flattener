@@ -1,12 +1,13 @@
 import os
-import core.utils as utils
-import core.constants as constants
-import core.flatten as flatten
 from datetime import datetime
 from typing import Any, Optional
-import core.gcp_client as gcp_client
 
-from flask import Flask, jsonify, request # type: ignore
+from flask import Flask, jsonify, request  # type: ignore
+
+import core.constants as constants
+import core.flatten as flatten
+import core.gcp_client as gcp_client
+import core.utils as utils
 
 app = Flask(__name__)
 

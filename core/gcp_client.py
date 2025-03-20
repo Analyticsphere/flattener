@@ -1,9 +1,11 @@
-from google.cloud import bigquery
+import json
+from typing import Optional
+
+from google.cloud import bigquery, pubsub_v1, storage
+
 import core.constants as constants
 import core.utils as utils
-from google.cloud import storage, pubsub_v1
-from typing import Optional
-import json
+
 
 def parse_gcs_path(gcs_path: str) -> tuple[str, str]:
     """
