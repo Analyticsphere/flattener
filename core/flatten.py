@@ -151,10 +151,10 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                     if field_path[0] == constants.SPECIAL_LOGIC_FIELDS.D_470862706.value:
                         D_470862706_field_path = f"{constants.SPECIAL_LOGIC_FIELDS.D_470862706.value}[1]"
                         field_path[0] = D_470862706_field_path
-                        sql_path = '.'.join([f'{part}' for part in field_path])
+                        sql_path = "CAST(" + '.'.join([f'{part}' for part in field_path]) + " AS STRING)"
                     else:
                         # Build SQL path with proper quoting
-                        sql_path = '.'.join([f'"{part}"' for part in field_path])
+                        sql_path = "CAST(" + '.'.join([f'"{part}"' for part in field_path]) + " AS STRING)"
 
                     
                     # Build alias by joining path parts with underscores
