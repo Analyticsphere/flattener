@@ -112,7 +112,7 @@ def escape_sql_value(val):
         return "NULL"
     return str(val).replace("\\", "\\\\").replace("'", "''").replace('"', '\\"')
 
-def create_flattening_select_statement(parque_path: str) -> str:
+def create_flattening_select_statement(parquet_path: str) -> str:
     # Create a SQL SELECT statement that, when exected, "expands" a nested Parquet file
 
     conn, local_db_file = utils.create_duckdb_connection()
@@ -121,7 +121,7 @@ def create_flattening_select_statement(parque_path: str) -> str:
         with conn:
             # Get schema of Parquet file
             # pandas must be installed, but doesn't need to be imported, for fetchdf() to work
-            schema = conn.execute(f"DESCRIBE SELECT * FROM read_parquet('{parque_path}') LIMIT 0").fetchdf()
+            schema = conn.execute(f"DESCRIBE SELECT * FROM read_parquet('{parquet_path}') LIMIT 0").fetchdf()
 
             # Declare empty list to hold SELECT expressions
             select_exprs = []
@@ -162,6 +162,11 @@ def create_flattening_select_statement(parque_path: str) -> str:
 
                     # Remove [] from alias
                     alias = alias.replace('[','',).replace(']','')
+
+                    # Remove entity string from column alias
+                    if '_entity_' in alias:
+                        utils.logger.warning(f"entity field identifed in {sql_path} within file {parquet_path}")
+                        alias = alias.replace('_entity', '')
                     
                     # Handle different field types
                     if field_type == 'VARCHAR[]':                        
@@ -170,7 +175,7 @@ def create_flattening_select_statement(parque_path: str) -> str:
                         distinct_vals_query = f"""
                             WITH vals AS (
                             SELECT DISTINCT UNNEST({sql_path}) AS val
-                            FROM read_parquet('{parque_path}')
+                            FROM read_parquet('{parquet_path}')
                             WHERE {sql_path} IS NOT NULL
                             )
                             SELECT * FROM vals WHERE TRY_CAST(val AS BIGINT) IS NOT NULL
@@ -206,7 +211,7 @@ def create_flattening_select_statement(parque_path: str) -> str:
                 final_query = f"""
                     SELECT
                     {', '.join(select_exprs)}
-                    FROM read_parquet('{parque_path}')
+                    FROM read_parquet('{parquet_path}')
                 """
 
                 return final_query
