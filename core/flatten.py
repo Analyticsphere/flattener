@@ -147,20 +147,22 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                     # DuckDB struggles to parse D_470862706
                     # The field is an array, and the second item in the array is a struct
                     # Without specifing the struct object in the array directly, DuckDB can't read the struct
-                    D_470862706_field_path = f"{constants.SPECIAL_LOGIC_FIELDS.D_470862706.value}[1]"
-                    if field_path[0] == constants.SPECIAL_LOGIC_FIELDS.D_470862706.value:
-                        field_path[0] = D_470862706_field_path
-                    #     sql_path = "CAST(" + '.'.join([f'{part}' for part in field_path]) + " AS STRING)"
-                    # else:
-                    #     # Build SQL path with proper quoting
-                    #     sql_path = "CAST(" + '.'.join([f'"{part}"' for part in field_path]) + " AS STRING)"
+                    # D_470862706_field_path = f"{constants.SPECIAL_LOGIC_FIELDS.D_470862706.value}[1]"
+                    # if field_path[0] == constants.SPECIAL_LOGIC_FIELDS.D_470862706.value:
+                    #     field_path[0] = D_470862706_field_path
+                    # #     sql_path = "CAST(" + '.'.join([f'{part}' for part in field_path]) + " AS STRING)"
+                    # # else:
+                    # #     # Build SQL path with proper quoting
+                    # #     sql_path = "CAST(" + '.'.join([f'"{part}"' for part in field_path]) + " AS STRING)"
+                    if field_path[0] == "D_470862706":
+                        field_path[0] = "D_470862706[1]"
 
                     # Skip if any part of the path should be ignored
                     if any(ignore in part for part in field_path for ignore in constants.IGNORE_FIELDS):
                         continue
                     
                     # Build SQL path with proper quoting
-                    if field_path[0] == D_470862706_field_path:
+                    if field_path[0] == "D_470862706[1]":
                         sql_path = '.'.join([f'{part}' for part in field_path])
                     else:
                         sql_path = '.'.join([f'"{part}"' for part in field_path])
