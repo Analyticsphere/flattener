@@ -212,11 +212,12 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                                 select_exprs.append(expr)
                         except Exception as e:
                             # Fallback to including the array as-is
-                            select_expr = f"{sql_path} AS {alias}"
+                            select_expr = f"CAST({sql_path} AS STRING) AS {alias}"
                             select_exprs.append(select_expr)
+                    
                     else:
                         # For non-array fields, include them as-is
-                        select_expr = f"{sql_path} AS {alias}"
+                        select_expr = f"CAST({sql_path} AS STRING) AS {alias}"
                         select_exprs.append(select_expr)
                 
             # Generate final SQL query
