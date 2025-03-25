@@ -177,12 +177,11 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                         alias = alias.replace('_entity', '')
                     
                     # Handle different field types
-                    # if field_type == 'VARCHAR[]' and \
-                    #     constants.SPECIAL_LOGIC_FIELDS.d_110349197.value not in field_path and \
-                    #     constants.SPECIAL_LOGIC_FIELDS.d_543608829.value not in field_path:
-                    #     # d_110349197 and d_543608829 must be represented as list of values per analyst requirements
-                    if field_type == 'VARCHAR[]' and 'd_110349197' not in field_path and 'd_543608829' not in field_path:
-                        utils.logger.warning(f"processing VARCHAR[] field {sql_path}")
+                    if field_type == 'VARCHAR[]' and \
+                        constants.SPECIAL_LOGIC_FIELDS.d_110349197.value not in field_path and \
+                        constants.SPECIAL_LOGIC_FIELDS.d_543608829.value not in field_path:
+                        # d_110349197 and d_543608829 must be represented as list of values per analyst requirements
+                        
                         # Query to get distinct values in the array used to build new columns
                         # Include the check for interger values so free-text survery responses don't get created as a column
                         distinct_vals_query = f"""
@@ -209,7 +208,6 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                                 
                                 # Create expression for binary indicator (1 if array contains value, 0 otherwise)
                                 expr = f"CAST(IFNULL(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER), 0) AS STRING) AS \"{new_col_name}\""
-                                print(f"\nAdding array indicator: {new_col_name}")
                                 select_exprs.append(expr)
                         except Exception as e:
                             # Fallback to including the array as-is
