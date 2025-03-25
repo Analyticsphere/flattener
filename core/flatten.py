@@ -177,7 +177,8 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                         alias = alias.replace('_entity', '')
                     
                     # Handle different field types
-                    if field_type == 'VARCHAR[]' and constants.SPECIAL_LOGIC_FIELDS.d_110349197.value not in field_path and constants.SPECIAL_LOGIC_FIELDS.d_543608829.value not in field_path:
+                    #if field_type == 'VARCHAR[]' and constants.SPECIAL_LOGIC_FIELDS.d_110349197.value not in field_path and constants.SPECIAL_LOGIC_FIELDS.d_543608829.value not in field_path:
+                    if field_type == 'VARCHAR[]' and 'd_110349197' not in field_path and 'd_543608829' not in field_path:
                         # d_110349197 and d_543608829 must be represented as list of values per analyst requirements
 
                         # Query to get distinct values in the array used to build new columns
