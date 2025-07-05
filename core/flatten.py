@@ -196,7 +196,6 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                             # Prod structure: D_470862706.entity.D_fieldname
                             # The entity field should already be in the path from extract_struct_fields
                             field_path[0] = f"{constants.SPECIAL_LOGIC_FIELDS.D_470862706.value}[1]"
-                            pass
                         elif d470862706_structure == 'direct_fields':
                             # Dev structure: D_470862706.D_fieldname
                             # The path should already be correct from extract_struct_fields
@@ -204,13 +203,14 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                         else:
                             # Unknown structure, log warning and try to process normally
                             utils.logger.warning(f"Unknown D_470862706 structure, processing normally")
+                            pass
 
                     # Skip if any part of the path should be ignored
                     if any(ignore in part for part in field_path for ignore in constants.IGNORE_FIELDS):
                         continue
                     
                     # Build SQL path
-                    sql_path = build_sql_path(field_path, d470862706_structure)
+                    sql_path = build_sql_path(field_path)
 
                     # Build alias by joining path parts with underscores
                     alias = '_'.join(field_path)
