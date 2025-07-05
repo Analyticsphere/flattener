@@ -193,11 +193,13 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                     # Handle special case for D_470862706 based on detected structure
                     if field_path[0] == constants.SPECIAL_LOGIC_FIELDS.D_470862706.value:
                         if d470862706_structure == 'entity_wrapper':
-                            # Prod structure: D_470862706.entity.D_fieldname
-                            # The entity field should already be in the path from extract_struct_fields
-                            field_path[0] = f"{constants.SPECIAL_LOGIC_FIELDS.D_470862706.value}[1]"
+                            # Prod structure
+                                # DuckDB struggles to parse D_470862706
+                                # The field is an array, and the third item in the array is a struct
+                                # Without specifing the struct object in the array directly, DuckDB can't read the struct
+                            field_path[0] = f"{constants.SPECIAL_LOGIC_FIELDS.D_470862706.value}[2]"
                         elif d470862706_structure == 'direct_fields':
-                            # Dev structure: D_470862706.D_fieldname
+                            # Dev structure
                             # The path should already be correct from extract_struct_fields
                             pass
                         else:
