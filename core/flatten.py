@@ -131,27 +131,27 @@ def escape_sql_value(val: any) -> str:
         return "NULL"
     return str(val).replace("\\", "\\\\").replace("'", "''").replace('"', '\\"')
 
-def build_sql_path(field_path: str) -> str:
-    """
-    Build the SQL path for accessing struct fields, handling D_470862706 special cases.
+# def build_sql_path(field_path: str) -> str:
+#     """
+#     Build the SQL path for accessing struct fields, handling D_470862706 special cases.
     
-    Args:
-        field_path: List of path components
-        d470862706_structure: Structure type for D_470862706 field
+#     Args:
+#         field_path: List of path components
+#         d470862706_structure: Structure type for D_470862706 field
         
-    Returns:
-        Properly formatted SQL path string
-    """
-    if not field_path:
-        return ""
+#     Returns:
+#         Properly formatted SQL path string
+#     """
+#     if not field_path:
+#         return ""
     
-    sql_parts = []
+#     sql_parts = []
     
-    for i, part in enumerate(field_path):
-        # Always quote field names for named structs
-        sql_parts.append(f'"{part}"')
+#     for i, part in enumerate(field_path):
+#         # Always quote field names for named structs
+#         sql_parts.append(f'"{part}"')
     
-    return '.'.join(sql_parts)
+#     return '.'.join(sql_parts)
 
 def create_flattening_select_statement(parquet_path: str) -> str:
     # Create a SQL SELECT statement that, when executed, "expands" a nested Parquet file
@@ -194,10 +194,9 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                     if field_path[0] == constants.SPECIAL_LOGIC_FIELDS.D_470862706.value:
                         if d470862706_structure == 'entity_wrapper':
                             # Prod structure
-                                # DuckDB struggles to parse D_470862706
-                                # The field is an array, and the third item in the array is a struct
+                                # DuckDB struggles to parse D_470862706 with the structure in prod
                                 # Without specifing the struct object in the array directly, DuckDB can't read the struct
-                            field_path[0] = f"{constants.SPECIAL_LOGIC_FIELDS.D_470862706.value}[2]"
+                            field_path[0] = f"{constants.SPECIAL_LOGIC_FIELDS.D_470862706.value}[1]"
                         elif d470862706_structure == 'direct_fields':
                             # Dev structure
                             # The path should already be correct from extract_struct_fields
@@ -212,7 +211,12 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                         continue
                     
                     # Build SQL path
-                    sql_path = build_sql_path(field_path)
+                    #sql_path = build_sql_path(field_path)
+                    # Build SQL path with proper quoting
+                    if field_path[0] == f"{constants.SPECIAL_LOGIC_FIELDS.D_470862706.value}[1]":
+                        sql_path = '.'.join([f'{part}' for part in field_path])
+                    else:
+                        sql_path = '.'.join([f'"{part}"' for part in field_path])
 
                     # Build alias by joining path parts with underscores
                     alias = '_'.join(field_path)
