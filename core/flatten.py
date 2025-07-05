@@ -125,13 +125,13 @@ def extract_struct_fields(schema_str, parent_path=[], d470862706_structure=None)
     
     return result
 
-def escape_sql_value(val):
+def escape_sql_value(val: any) -> str:
     # Safely escape values for SQL
     if val is None:
         return "NULL"
     return str(val).replace("\\", "\\\\").replace("'", "''").replace('"', '\\"')
 
-def build_sql_path(field_path, d470862706_structure=None):
+def build_sql_path(field_path: str) -> str:
     """
     Build the SQL path for accessing struct fields, handling D_470862706 special cases.
     
@@ -195,7 +195,7 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                         if d470862706_structure == 'entity_wrapper':
                             # Prod structure: D_470862706.entity.D_fieldname
                             # The entity field should already be in the path from extract_struct_fields
-                            # No modification needed - the path should be correct
+                            field_path[0] = f"{constants.SPECIAL_LOGIC_FIELDS.D_470862706.value}[1]"
                             pass
                         elif d470862706_structure == 'direct_fields':
                             # Dev structure: D_470862706.D_fieldname
