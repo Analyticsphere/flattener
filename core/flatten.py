@@ -4,62 +4,15 @@ import core.constants as constants
 import core.utils as utils
 
 
-def debug_schema_structure(parquet_path: str) -> None:
-    """
-    Debug function to examine the schema structure of a Parquet file
-    """
-    conn, local_db_file = utils.create_duckdb_connection()
-    
-    try:
-        with conn:
-            # Get schema of Parquet file
-            schema = conn.execute(f"DESCRIBE SELECT * FROM read_parquet('{parquet_path}') LIMIT 0").fetchdf()
-            
-            utils.logger.info("=== SCHEMA DEBUG INFO ===")
-            for _, row in schema.iterrows():
-                col_name = row['column_name']
-                col_type = row['column_type']
-                utils.logger.info(f"Column: {col_name}")
-                utils.logger.info(f"Type: {col_type}")
-                
-                # Extract fields and log them
-                try:
-                    fields = extract_struct_fields(col_type, [col_name])
-                    utils.logger.info(f"Extracted {len(fields)} fields:")
-                    for field_type, field_path in fields[:10]:  # Limit to first 10 for readability
-                        utils.logger.info(f"  - {field_path} -> {field_type}")
-                    if len(fields) > 10:
-                        utils.logger.info(f"  ... and {len(fields) - 10} more fields")
-                except Exception as e:
-                    utils.logger.error(f"Error extracting fields for {col_name}: {e}")
-                
-                utils.logger.info("---")
-                
-    except Exception as e:
-        utils.logger.error(f"Unable to debug schema: {e}")
-    finally:
-        utils.close_duckdb_connection(conn, local_db_file)
-
-
 def flatten_table_file(destination_bucket: str, table_name: str) -> None:
     # Generate a SQL statement that "flattens" a Parquet file and then execute it to create a new file
     source_parquet_path = utils.get_raw_parquet_file_location(destination_bucket, table_name)
     flattened_file_path = utils.get_flattened_parquet_file_location(destination_bucket, table_name)
 
-    # Add debug logging for module3_v1
-    if table_name == "module3_v1":
-        utils.logger.info("Debugging module3_v1 schema structure...")
-        debug_schema_structure(source_parquet_path)
-
     # Build the SELECT statement
     select_statement = create_flattening_select_statement(source_parquet_path)
 
     if select_statement:
-        # Log the generated SQL for debugging
-        if table_name == "module3_v1":
-            utils.logger.info("Generated SQL for module3_v1:")
-            utils.logger.info(select_statement[:2000] + "..." if len(select_statement) > 2000 else select_statement)
-
         final_query = f"""
         COPY (
             {select_statement}
@@ -73,21 +26,35 @@ def flatten_table_file(destination_bucket: str, table_name: str) -> None:
                 conn.execute(final_query)
         except Exception as e:
             utils.logger.error(f"Unable to execute flattening SQL: {e}")
-            # For module3_v1, also log the problematic SQL
-            if table_name == "module3_v1":
-                utils.logger.error("Full SQL that failed:")
-                utils.logger.error(final_query)
             raise Exception(f"Unable to execute flattening SQL: {e}") from e
         finally:
             utils.close_duckdb_connection(conn, local_db_file)
 
-def extract_struct_fields(schema_str, parent_path=[]):
+def detect_d470862706_structure(schema_str):
+    """
+    Detect whether D_470862706 has the 'entity' wrapper or direct field structure.
+    
+    Returns:
+        'entity_wrapper' if it has string and entity fields (prod structure)
+        'direct_fields' if it has direct D_* fields (dev structure)
+        'unknown' if structure can't be determined
+    """
+    # Look for the entity field pattern
+    if 'entity STRUCT(' in schema_str:
+        return 'entity_wrapper'
+    elif re.search(r'D_\d+\s+VARCHAR\[\]', schema_str):
+        return 'direct_fields'
+    else:
+        return 'unknown'
+
+def extract_struct_fields(schema_str, parent_path=[], d470862706_structure=None):
     """
     Extract all fields from a struct schema string with their proper hierarchical paths
     
     Args:
         schema_str: The schema string to parse
         parent_path: Current path in the hierarchy
+        d470862706_structure: Structure type for D_470862706 field
         
     Returns:
         List of tuples (field_type, complete_path) for all fields
@@ -150,7 +117,7 @@ def extract_struct_fields(schema_str, parent_path=[]):
         
         if field_type.startswith('STRUCT'):
             # This is a nested struct, process recursively
-            nested_fields = extract_struct_fields(field_type, current_path)
+            nested_fields = extract_struct_fields(field_type, current_path, d470862706_structure)
             result.extend(nested_fields)
         else:
             # This is a field
@@ -164,12 +131,13 @@ def escape_sql_value(val):
         return "NULL"
     return str(val).replace("\\", "\\\\").replace("'", "''").replace('"', '\\"')
 
-def build_sql_path(field_path):
+def build_sql_path(field_path, d470862706_structure=None):
     """
-    Build the SQL path for accessing struct fields, handling special cases properly.
+    Build the SQL path for accessing struct fields, handling D_470862706 special cases.
     
     Args:
         field_path: List of path components
+        d470862706_structure: Structure type for D_470862706 field
         
     Returns:
         Properly formatted SQL path string
@@ -180,19 +148,8 @@ def build_sql_path(field_path):
     sql_parts = []
     
     for i, part in enumerate(field_path):
-        # Handle special case for D_470862706 array access
-        if part.startswith(constants.SPECIAL_LOGIC_FIELDS.D_470862706.value + "["):
-            # This is the array access part, use as-is
-            sql_parts.append(part)
-        elif i == 0:
-            # First part - quote if it doesn't contain array access
-            if '[' in part and ']' in part:
-                sql_parts.append(part)  # Already has array notation
-            else:
-                sql_parts.append(f'"{part}"')
-        else:
-            # Subsequent parts should always be quoted field names
-            sql_parts.append(f'"{part}"')
+        # Always quote field names for named structs
+        sql_parts.append(f'"{part}"')
     
     return '.'.join(sql_parts)
 
@@ -208,6 +165,14 @@ def create_flattening_select_statement(parquet_path: str) -> str:
             # pandas must be installed, but doesn't need to be imported, for fetchdf() to work
             schema = conn.execute(f"DESCRIBE SELECT * FROM read_parquet('{parquet_path}') LIMIT 0").fetchdf()
 
+            # First, detect the structure of D_470862706 if it exists
+            d470862706_structure = None
+            for _, row in schema.iterrows():
+                if row['column_name'] == constants.SPECIAL_LOGIC_FIELDS.D_470862706.value:
+                    d470862706_structure = detect_d470862706_structure(row['column_type'])
+                    utils.logger.info(f"Detected D_470862706 structure: {d470862706_structure}")
+                    break
+
             # Declare empty list to hold SELECT expressions
             select_exprs = []
 
@@ -221,39 +186,39 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                     continue
                                 
                 # Extract all fields with their correct hierarchical paths
-                fields = extract_struct_fields(col_type, [col_name])
+                fields = extract_struct_fields(col_type, [col_name], d470862706_structure)
                 
                 for field_type, field_path in fields:
 
-                    # Handle special case for D_470862706
-                    # The field is an array, and the second item in the array is a struct
-                    # if field_path[0] == constants.SPECIAL_LOGIC_FIELDS.D_470862706.value:
-                    #     # Create a new path with array access notation
-                    #     modified_path = field_path.copy()
-                    #     modified_path[0] = f"{constants.SPECIAL_LOGIC_FIELDS.D_470862706.value}[1]"
-                    #     field_path = modified_path
+                    # Handle special case for D_470862706 based on detected structure
+                    if field_path[0] == constants.SPECIAL_LOGIC_FIELDS.D_470862706.value:
+                        if d470862706_structure == 'entity_wrapper':
+                            # Prod structure: D_470862706.entity.D_fieldname
+                            # The entity field should already be in the path from extract_struct_fields
+                            # No modification needed - the path should be correct
+                            pass
+                        elif d470862706_structure == 'direct_fields':
+                            # Dev structure: D_470862706.D_fieldname
+                            # The path should already be correct from extract_struct_fields
+                            pass
+                        else:
+                            # Unknown structure, log warning and try to process normally
+                            utils.logger.warning(f"Unknown D_470862706 structure, processing normally")
 
                     # Skip if any part of the path should be ignored
                     if any(ignore in part for part in field_path for ignore in constants.IGNORE_FIELDS):
                         continue
                     
-                    # Build SQL path with proper handling for different cases
-                    sql_path = build_sql_path(field_path)
+                    # Build SQL path
+                    sql_path = build_sql_path(field_path, d470862706_structure)
 
                     # Build alias by joining path parts with underscores
                     alias = '_'.join(field_path)
 
-                    # Remove [] from alias
-                    alias = alias.replace('[','').replace(']','')
-
-                    # Remove entity string from column alias
+                    # Remove entity string from column alias for cleaner names
                     if '_entity_' in alias:
                         utils.logger.warning(f"entity field identified in {sql_path} within file {parquet_path}")
                         alias = alias.replace('_entity', '')
-                    
-                    # Debug logging for module3_v1
-                    if "module3_v1" in parquet_path:
-                        utils.logger.debug(f"Processing field: {field_path} -> {sql_path} (type: {field_type})")
                     
                     # Handle different field types
                     if field_type == 'VARCHAR[]' and constants.SPECIAL_LOGIC_FIELDS.d_110349197.value not in field_path and constants.SPECIAL_LOGIC_FIELDS.d_543608829.value not in field_path:
