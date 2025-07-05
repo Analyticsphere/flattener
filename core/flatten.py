@@ -221,6 +221,9 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                     # Build alias by joining path parts with underscores
                     alias = '_'.join(field_path)
 
+                    # Remove [1] and [] from alias
+                    alias = alias.replace('[1]', '').replace('[','',).replace(']','')
+
                     # Remove entity string from column alias for cleaner names
                     if '_entity_' in alias:
                         utils.logger.warning(f"entity field identified in {sql_path} within file {parquet_path}")
