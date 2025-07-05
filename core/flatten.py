@@ -2,7 +2,7 @@ import re
 
 import core.constants as constants
 import core.utils as utils
-
+from typing import Any
 
 def flatten_table_file(destination_bucket: str, table_name: str) -> None:
     # Generate a SQL statement that "flattens" a Parquet file and then execute it to create a new file
@@ -30,7 +30,24 @@ def flatten_table_file(destination_bucket: str, table_name: str) -> None:
         finally:
             utils.close_duckdb_connection(conn, local_db_file)
 
-def extract_struct_fields(schema_str, parent_path=[]):
+def detect_d470862706_structure(schema_str: str) -> str:
+    """
+    Detect whether D_470862706 has the 'entity' wrapper or direct field structure.
+    
+    Returns:
+        'entity_wrapper' if it has string and entity fields (prod structure)
+        'direct_fields' if it has direct D_* fields (dev structure)
+        'unknown' if structure can't be determined
+    """
+    # Look for the entity field pattern
+    if 'entity STRUCT(' in schema_str:
+        return 'entity_wrapper'
+    elif re.search(r'D_\d+\s+VARCHAR\[\]', schema_str):
+        return 'direct_fields'
+    else:
+        return 'unknown'
+
+def extract_struct_fields(schema_str: str, parent_path=[]) -> list:
     """
     Extract all fields from a struct schema string with their proper hierarchical paths
     
@@ -44,7 +61,6 @@ def extract_struct_fields(schema_str, parent_path=[]):
     result = []
     
     # Match STRUCT pattern
-    #struct_match = re.match(r'^STRUCT\((.*)\)$', schema_str.strip())
     struct_match = re.match(r'^STRUCT\((.*)\)', schema_str.strip())
     if not struct_match:
         # Not a struct, return the field type and path
@@ -108,14 +124,14 @@ def extract_struct_fields(schema_str, parent_path=[]):
     
     return result
 
-def escape_sql_value(val):
+def escape_sql_value(val: Any) -> str:
     # Safely escape values for SQL
     if val is None:
         return "NULL"
     return str(val).replace("\\", "\\\\").replace("'", "''").replace('"', '\\"')
 
 def create_flattening_select_statement(parquet_path: str) -> str:
-    # Create a SQL SELECT statement that, when exected, "expands" a nested Parquet file
+    # Create a SQL SELECT statement that, when executed, "expands" a nested Parquet file
     # All fields must be of type STRING per analyst requirements
 
     conn, local_db_file = utils.create_duckdb_connection()
@@ -125,6 +141,14 @@ def create_flattening_select_statement(parquet_path: str) -> str:
             # Get schema of Parquet file
             # pandas must be installed, but doesn't need to be imported, for fetchdf() to work
             schema = conn.execute(f"DESCRIBE SELECT * FROM read_parquet('{parquet_path}') LIMIT 0").fetchdf()
+
+            # First, detect the structure of D_470862706 if it exists
+            d470862706_structure = None
+            for _, row in schema.iterrows():
+                if row['column_name'] == constants.SPECIAL_LOGIC_FIELDS.D_470862706.value:
+                    d470862706_structure = detect_d470862706_structure(row['column_type'])
+                    utils.logger.info(f"Detected D_470862706 structure: {d470862706_structure}")
+                    break
 
             # Declare empty list to hold SELECT expressions
             select_exprs = []
@@ -143,11 +167,21 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                 
                 for field_type, field_path in fields:
 
-                    # DuckDB struggles to parse D_470862706
-                    # The field is an array, and the second item in the array is a struct
-                    # Without specifing the struct object in the array directly, DuckDB can't read the struct
+                    # Handle special case for D_470862706 based on detected structure
                     if field_path[0] == constants.SPECIAL_LOGIC_FIELDS.D_470862706.value:
-                        field_path[0] = f"{constants.SPECIAL_LOGIC_FIELDS.D_470862706.value}[1]"
+                        if d470862706_structure == 'entity_wrapper':
+                            # Prod structure
+                                # DuckDB struggles to parse D_470862706 with the structure in prod
+                                # Without specifing the struct object in the array directly, DuckDB can't read the struct
+                            field_path[0] = f"{constants.SPECIAL_LOGIC_FIELDS.D_470862706.value}[1]"
+                        elif d470862706_structure == 'direct_fields':
+                            # Dev structure
+                            # The path should already be correct from extract_struct_fields
+                            pass
+                        else:
+                            # Unknown structure, log warning and try to process normally
+                            utils.logger.warning(f"Unknown D_470862706 structure, processing normally")
+                            pass
 
                     # Skip if any part of the path should be ignored
                     if any(ignore in part for part in field_path for ignore in constants.IGNORE_FIELDS):
@@ -162,12 +196,12 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                     # Build alias by joining path parts with underscores
                     alias = '_'.join(field_path)
 
-                    # Remove [] from alias
-                    alias = alias.replace('[','',).replace(']','')
+                    # Remove [1] and [] from alias
+                    alias = alias.replace('[1]', '').replace('[','',).replace(']','')
 
-                    # Remove entity string from column alias
+                    # Remove entity string from column alias for cleaner names
                     if '_entity_' in alias:
-                        utils.logger.warning(f"entity field identifed in {sql_path} within file {parquet_path}")
+                        utils.logger.warning(f"entity field identified in {sql_path} within file {parquet_path}")
                         alias = alias.replace('_entity', '')
                     
                     # Handle different field types
@@ -175,7 +209,7 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                         # d_110349197 and d_543608829 must be represented as list of values per analyst requirements
 
                         # Query to get distinct values in the array used to build new columns
-                        # Include the check for interger values so free-text survery responses don't get created as a column
+                        # Include the check for integer values so free-text survey responses don't get created as a column
                         distinct_vals_query = f"""
                             WITH vals AS (
                             SELECT DISTINCT UNNEST({sql_path}) AS val
@@ -203,12 +237,13 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                                 select_exprs.append(expr)
                         except Exception as e:
                             # Fallback to including the array as-is
-                            select_expr = f"CAST({sql_path} AS STRING) AS {alias}"
+                            utils.logger.warning(f"Could not expand array field {sql_path}: {e}")
+                            select_expr = f"CAST({sql_path} AS STRING) AS \"{alias}\""
                             select_exprs.append(select_expr)
                     
                     else:
                         # For non-array fields, include them as-is
-                        select_expr = f"CAST({sql_path} AS STRING) AS {alias}"
+                        select_expr = f"CAST({sql_path} AS STRING) AS \"{alias}\""
                         select_exprs.append(select_expr)
                 
             # Generate final SQL query
@@ -220,10 +255,10 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                 """
 
                 return final_query
+        return ""
             
     except Exception as e:
         utils.logger.error(f"Unable to process incoming Parquet file: {e}")
         raise Exception(f"Unable to process incoming Parquet file: {e}") from e
     finally:
         utils.close_duckdb_connection(conn, local_db_file)
-
