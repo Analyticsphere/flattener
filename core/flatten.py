@@ -2,7 +2,7 @@ import re
 
 import core.constants as constants
 import core.utils as utils
-
+from typing import Any
 
 def flatten_table_file(destination_bucket: str, table_name: str) -> None:
     # Generate a SQL statement that "flattens" a Parquet file and then execute it to create a new file
@@ -30,7 +30,7 @@ def flatten_table_file(destination_bucket: str, table_name: str) -> None:
         finally:
             utils.close_duckdb_connection(conn, local_db_file)
 
-def detect_d470862706_structure(schema_str):
+def detect_d470862706_structure(schema_str: str) -> str:
     """
     Detect whether D_470862706 has the 'entity' wrapper or direct field structure.
     
@@ -47,14 +47,13 @@ def detect_d470862706_structure(schema_str):
     else:
         return 'unknown'
 
-def extract_struct_fields(schema_str, parent_path=[], d470862706_structure=None):
+def extract_struct_fields(schema_str: str, parent_path=[]) -> list:
     """
     Extract all fields from a struct schema string with their proper hierarchical paths
     
     Args:
         schema_str: The schema string to parse
         parent_path: Current path in the hierarchy
-        d470862706_structure: Structure type for D_470862706 field
         
     Returns:
         List of tuples (field_type, complete_path) for all fields
@@ -117,7 +116,7 @@ def extract_struct_fields(schema_str, parent_path=[], d470862706_structure=None)
         
         if field_type.startswith('STRUCT'):
             # This is a nested struct, process recursively
-            nested_fields = extract_struct_fields(field_type, current_path, d470862706_structure)
+            nested_fields = extract_struct_fields(field_type, current_path)
             result.extend(nested_fields)
         else:
             # This is a field
@@ -125,33 +124,11 @@ def extract_struct_fields(schema_str, parent_path=[], d470862706_structure=None)
     
     return result
 
-def escape_sql_value(val: any) -> str:
+def escape_sql_value(val: Any) -> str:
     # Safely escape values for SQL
     if val is None:
         return "NULL"
     return str(val).replace("\\", "\\\\").replace("'", "''").replace('"', '\\"')
-
-# def build_sql_path(field_path: str) -> str:
-#     """
-#     Build the SQL path for accessing struct fields, handling D_470862706 special cases.
-    
-#     Args:
-#         field_path: List of path components
-#         d470862706_structure: Structure type for D_470862706 field
-        
-#     Returns:
-#         Properly formatted SQL path string
-#     """
-#     if not field_path:
-#         return ""
-    
-#     sql_parts = []
-    
-#     for i, part in enumerate(field_path):
-#         # Always quote field names for named structs
-#         sql_parts.append(f'"{part}"')
-    
-#     return '.'.join(sql_parts)
 
 def create_flattening_select_statement(parquet_path: str) -> str:
     # Create a SQL SELECT statement that, when executed, "expands" a nested Parquet file
@@ -186,7 +163,7 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                     continue
                                 
                 # Extract all fields with their correct hierarchical paths
-                fields = extract_struct_fields(col_type, [col_name], d470862706_structure)
+                fields = extract_struct_fields(col_type, [col_name])
                 
                 for field_type, field_path in fields:
 
@@ -210,8 +187,6 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                     if any(ignore in part for part in field_path for ignore in constants.IGNORE_FIELDS):
                         continue
                     
-                    # Build SQL path
-                    #sql_path = build_sql_path(field_path)
                     # Build SQL path with proper quoting
                     if field_path[0] == f"{constants.SPECIAL_LOGIC_FIELDS.D_470862706.value}[1]":
                         sql_path = '.'.join([f'{part}' for part in field_path])
@@ -280,6 +255,7 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                 """
 
                 return final_query
+        return ""
             
     except Exception as e:
         utils.logger.error(f"Unable to process incoming Parquet file: {e}")
