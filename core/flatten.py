@@ -236,7 +236,7 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                                 # expr = f"CAST(IFNULL(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER), 0) AS STRING) AS \"{new_col_name}\""
                                 # expr = f"CAST(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER) AS STRING) AS \"{new_col_name}\""
                                 # expr = f"CAST(IFNULL({sql_path}, 3) AS STRING) AS \"{new_col_name}\""
-                                expr = f"IFNULL(CAST(array_contains({sql_path}, 'NULL') AS STRING), 'NULL') AS \"{new_col_name}\""
+                                expr = f"CAST(IFNULL({sql_path}, 'NULL') AS STRING) AS \"{new_col_name}\""
                                 select_exprs.append(expr)                                
                                 
                                 expr = f"CAST(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER) AS STRING) AS \"{new_col_name}\""
