@@ -241,8 +241,8 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                                 select_exprs.append(expr)
                                 
                                 # expr = f"CAST(IFNULL({sql_path}, 3) AS STRING) AS \"{new_col_name}\""
-                                # expr = f"IFNULL(CAST(array_contains({sql_path}, 'NULL') AS STRING), 'NULL') AS \"{new_col_name}\""
-                                # select_exprs.append(expr)
+                                expr = f"IFNULL(CAST(array_contains({sql_path}, {'NULL'}) AS STRING), 'NULL') AS \"{new_col_name}\""
+                                select_exprs.append(expr)
                         except Exception as e:
                             # Fallback to including the array as-is
                             utils.logger.warning(f"Could not expand array field {sql_path}: {e}")
