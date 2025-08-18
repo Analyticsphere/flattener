@@ -232,7 +232,7 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                                 # Escape the value for SQL
                                 escaped_val = escape_sql_value(val)
                                 
-                                if escaped_val is "NULL":
+                                if escaped_val is None: 
                                     expr = f"CAST({sql_path} AS STRING) AS \"{new_col_name}\""
                                     select_exprs.append(expr)
                                 else: 
