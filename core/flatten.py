@@ -237,7 +237,7 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                                 
                                 # select_exprs.append(expr)
                                 
-                                if escaped_val == 'NULL': 
+                                if val == 'NULL': 
                                     expr = f"CAST(IFNULL({sql_path}, 'NULL') AS STRING) AS \"{new_col_name}\""
                                     select_exprs.append(expr)
                                     
