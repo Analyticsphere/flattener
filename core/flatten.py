@@ -242,7 +242,7 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                                     select_exprs.append(expr)
                                     
                                 else: 
-                                    expr = f"CAST(IFNULL(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER), NULL) AS STRING) AS \"{new_col_name}\""
+                                    expr = f"CAST((CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER) AS STRING) AS \"{new_col_name}\""
                                     select_exprs.append(expr)
                                 
                         except Exception as e:
