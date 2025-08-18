@@ -233,17 +233,10 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                                 escaped_val = escape_sql_value(val)
                                 
                                 # Create expression for binary indicator (1 if array contains value, 0 otherwise)
-                                # expr = f"CAST(IFNULL(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER), 0) AS STRING) AS \"{new_col_name}\"" #<-- Original Code
+                                expr = f"CAST(IFNULL(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER), 0) AS STRING) AS \"{new_col_name}\"" #<-- Original Code
                                 
-                                # select_exprs.append(expr)
+                                select_exprs.append(expr)
                                 
-                                if val is None: 
-                                    expr = f"CAST({sql_path} AS STRING) AS \"{new_col_name}\""
-                                    select_exprs.append(expr)
-                                    
-                                else: 
-                                    expr = f"CAST(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER) AS STRING) AS \"{new_col_name}\""
-                                    select_exprs.append(expr)
                                 
                         except Exception as e:
                             # Fallback to including the array as-is
