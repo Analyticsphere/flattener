@@ -232,12 +232,17 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                                 # Escape the value for SQL
                                 escaped_val = escape_sql_value(val)
                                 
-                                # Create expression for binary indicator (1 if array contains value, 0 otherwise)
-                                expr = f"CAST(IFNULL(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER), NULL) AS STRING) AS \"{new_col_name}\""
-                                # expr = f"CAST(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER) AS STRING) AS \"{new_col_name}\""
-                                # expr = f"CAST(CAST(array_contains(IFNULL({sql_path}, ARRAY[NULL]), '{escaped_val}') AS INTEGER) AS STRING) AS \"{new_col_name}\""
-                                                                
-                                select_exprs.append(expr)
+                                # # Create expression for binary indicator (1 if array contains value, 0 otherwise)
+                                # expr = f"CAST(IFNULL(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER), 0) AS STRING) AS \"{new_col_name}\"" #<-- Original Code
+                                
+                                # select_exprs.append(expr)
+                                
+                                if sql_path is not 'NULL': 
+                                    expr = f"CAST(IFNULL(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER), NULL) AS STRING) AS \"{new_col_name}\""
+                                    select_exprs.append(expr)
+                                else: 
+                                    expr = f"CAST({sql_path} AS STRING) AS \"{new_col_name}\""
+                                    select_exprs.append(expr)
                                 
                         except Exception as e:
                             # Fallback to including the array as-is
