@@ -214,9 +214,9 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                             WITH vals AS (
                             SELECT DISTINCT UNNEST({sql_path}) AS val
                             FROM read_parquet('{parquet_path}')
-                            
+                            WHERE {sql_path} IS NOT NULL
                             )
-                            SELECT * FROM vals WHERE TRY_CAST(val AS BIGINT)
+                            SELECT * FROM vals WHERE TRY_CAST(val AS BIGINT) IS NOT NULL
                         """
             
                         try:
@@ -232,7 +232,7 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                                 # Escape the value for SQL
                                 escaped_val = escape_sql_value(val)
                                 
-                                # expr = f"CAST(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER) AS STRING) AS \"{new_col_name}\"" #<-- Original Code
+                                # expr = f"CAST(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER) AS STRING) AS \"{new_col_name}\"" 
                                 # select_exprs.append(expr)
                                 
                                 # Create expression for binary indicator (1 if array contains value, 0 otherwise)
