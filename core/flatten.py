@@ -236,7 +236,7 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                                 # select_exprs.append(expr)
                                 
                                 # Create expression for binary indicator (1 if array contains value, 0 otherwise)
-                                expr = f"CAST(IFNULL(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER), 0) AS STRING) AS \"{new_col_name}\"" #<-- Original Code
+                                expr = f"CAST(IFNULL(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER), NULL) AS STRING) AS \"{new_col_name}\"" #<-- Original Code
                                 
                                 select_exprs.append(expr)
                                 
