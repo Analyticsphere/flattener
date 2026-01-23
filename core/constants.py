@@ -11,7 +11,7 @@ DUCKDB_THREADS = "4"
 
 IGNORE_FIELDS = [
     '__key__', '__error__', '__has_error__', 'treeJSON', 'namespace', 'app', 'path',
-     'kind', 'name', 'id', 'COMPLETED', 'COMPLETED_TS', 'sha', '569151507', 'D_726699695_V2',
+     'kind', 'name', 'id', 'COMPLETED', 'COMPLETED_TS', 'sha', 'D_726699695_V2',
      'Module2', 'undefined', 'key', 'query', 'D_726699695','D_299215535', 'D_166676176'
 ]
 
