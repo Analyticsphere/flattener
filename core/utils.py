@@ -1,7 +1,9 @@
 import logging
 import os
 import sys
+import tempfile
 import uuid
+from typing import Any
 
 import duckdb
 from fsspec import filesystem  # type: ignore
@@ -26,9 +28,9 @@ def create_duckdb_connection() -> tuple[duckdb.DuckDBPyConnection, str]:
     try:
         random_string = str(uuid.uuid4())
         
-        # GCS bucket mounted to /mnt/data/ in clouldbuild.yml
-        tmp_dir = f"/mnt/data/"
-        local_db_file = f"{tmp_dir}{random_string}.db"
+        # Cloud Run mounts /mnt/data, but local/dev environments generally do not.
+        tmp_dir = "/mnt/data" if os.path.isdir("/mnt/data") else tempfile.gettempdir()
+        local_db_file = os.path.join(tmp_dir, f"{random_string}.db")
 
         conn = duckdb.connect(local_db_file)
         conn.execute(f"SET temp_directory='{tmp_dir}'")
@@ -45,8 +47,11 @@ def create_duckdb_connection() -> tuple[duckdb.DuckDBPyConnection, str]:
         # Set max disk space to allow on GCS
         conn.execute(f"SET max_temp_directory_size='{constants.DUCKDB_MAX_SIZE}'")
 
-        # Register GCS filesystem to read/write to GCS buckets
-        conn.register_filesystem(filesystem('gcs'))
+        # Register GCS filesystem to read/write to GCS buckets when available.
+        try:
+            conn.register_filesystem(filesystem('gcs'))
+        except ImportError:
+            logger.warning("gcsfs is not available; skipping GCS filesystem registration")
 
         return conn, local_db_file
     except Exception as e:
@@ -73,6 +78,27 @@ def get_raw_parquet_file_location(destination_bucket: str, table_name: str) -> s
 def get_flattened_parquet_file_location(destination_bucket: str, table_name: str) -> str:
     parquet_path = f"gs://{destination_bucket}/{table_name}/flattened/{table_name}.parquet"
     return parquet_path
+
+def get_parquet_column_names(parquet_path: str) -> set[str]:
+    conn, local_db_file = create_duckdb_connection()
+
+    try:
+        with conn:
+            schema = conn.execute(
+                f"DESCRIBE SELECT * FROM read_parquet('{parquet_path}') LIMIT 0"
+            ).fetchdf()
+            return set(schema["column_name"].tolist())
+    except Exception as e:
+        logger.error(f"Unable to describe incoming Parquet file: {e}")
+        raise Exception(f"Unable to describe incoming Parquet file: {e}") from e
+    finally:
+        close_duckdb_connection(conn, local_db_file)
+
+def escape_sql_value(val: Any) -> str:
+    if val is None:
+        return "NULL"
+
+    return str(val).replace("\\", "\\\\").replace("'", "''").replace('"', '\\"')
 
 def valid_parquet_file(gcs_file_path: str) -> bool:
     # Retuns bool indicating whether Parquet file is valid/can be read by DuckDB

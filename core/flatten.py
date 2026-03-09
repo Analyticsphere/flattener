@@ -2,7 +2,6 @@ import re
 
 import core.constants as constants
 import core.utils as utils
-from typing import Any
 
 def flatten_table_file(destination_bucket: str, table_name: str) -> None:
     # Generate a SQL statement that "flattens" a Parquet file and then execute it to create a new file
@@ -10,7 +9,11 @@ def flatten_table_file(destination_bucket: str, table_name: str) -> None:
     flattened_file_path = utils.get_flattened_parquet_file_location(destination_bucket, table_name)
 
     # Build the SELECT statement
-    select_statement = create_flattening_select_statement(source_parquet_path)
+    if table_name.lower() == constants.SPECIAL_LOGIC_TABLES.BOXES.value:
+        utils.logger.info(f"Using boxes-specific flattening logic for {table_name}")
+        select_statement = create_boxes_flattening_select_statement(source_parquet_path)
+    else:
+        select_statement = create_flattening_select_statement(source_parquet_path)
 
     if select_statement:
         final_query = f"""
@@ -29,6 +32,87 @@ def flatten_table_file(destination_bucket: str, table_name: str) -> None:
             raise Exception(f"Unable to execute flattening SQL: {e}") from e
         finally:
             utils.close_duckdb_connection(conn, local_db_file)
+
+def create_boxes_field_select_statement(field_name: str, available_columns: set[str]) -> str:
+    if field_name not in available_columns:
+        return f'CAST(NULL AS STRING) AS "{field_name}"'
+
+    return f'CAST(src."{field_name}" AS STRING) AS "{field_name}"'
+
+def create_boxes_bag_select_statement(bag_field: str, available_columns: set[str]) -> str:
+    bag_ref = f'src."{bag_field}"'
+    select_exprs = [
+        create_boxes_field_select_statement(field_name, available_columns)
+        for field_name in constants.BOXES_PARENT_FIELDS
+    ]
+
+    bag_id_expr = ', '.join(
+        f"NULLIF(CAST({bag_ref}.\"{field_name}\" AS STRING), '')"
+        for field_name, _ in constants.BOXES_BAG_TYPE_FIELDS
+    )
+
+    bag_type_expr = " ".join(
+        [
+            "CASE",
+            *[
+                (
+                    f"WHEN NULLIF(CAST({bag_ref}.\"{field_name}\" AS STRING), '') IS NOT NULL "
+                    f"THEN '{label}'"
+                )
+                for field_name, label in constants.BOXES_BAG_TYPE_FIELDS
+            ],
+            "ELSE '' END AS \"bagType\"",
+        ]
+    )
+
+    select_exprs.extend(
+        [
+            f'COALESCE({bag_id_expr}) AS "bagID"',
+            bag_type_expr,
+            f'CAST({bag_ref}."d_469819603" AS STRING) AS "d_469819603"',
+            f'CAST({bag_ref}."d_255283733" AS STRING) AS "d_255283733"',
+            'CAST(tubes.tube_id AS STRING) AS "tubeID"',
+        ]
+    )
+
+    return f"""
+        SELECT
+            {', '.join(select_exprs)}
+        FROM source AS src,
+        UNNEST({bag_ref}."d_234868461") AS tubes(tube_id)
+        WHERE {bag_ref} IS NOT NULL
+    """
+
+def create_boxes_flattening_select_statement(parquet_path: str) -> str:
+    available_columns = utils.get_parquet_column_names(parquet_path)
+
+    if constants.BOXES_BAG_FIELDS[0] not in available_columns:
+        raise Exception(
+            f"Boxes-specific flattening requires {constants.BOXES_BAG_FIELDS[0]} in {parquet_path}"
+        )
+
+    bag_selects = [
+        create_boxes_bag_select_statement(bag_field, available_columns)
+        for bag_field in constants.BOXES_BAG_FIELDS
+        if bag_field in available_columns
+    ]
+
+    if not bag_selects:
+        raise Exception(f"No boxes bag fields found in {parquet_path}")
+
+    return f"""
+        WITH source AS (
+            SELECT *
+            FROM read_parquet('{parquet_path}')
+            WHERE "d_650224161" IS NOT NULL
+        ),
+        flattened_boxes AS (
+            {' UNION ALL '.join(bag_selects)}
+        )
+        SELECT *
+        FROM flattened_boxes
+        ORDER BY "d_132929440"
+    """
 
 def detect_d470862706_structure(schema_str: str) -> str:
     """
@@ -123,12 +207,6 @@ def extract_struct_fields(schema_str: str, parent_path=[]) -> list:
             result.append((field_type, current_path))
     
     return result
-
-def escape_sql_value(val: Any) -> str:
-    # Safely escape values for SQL
-    if val is None:
-        return "NULL"
-    return str(val).replace("\\", "\\\\").replace("'", "''").replace('"', '\\"')
 
 def create_flattening_select_statement(parquet_path: str) -> str:
     # Create a SQL SELECT statement that, when executed, "expands" a nested Parquet file
@@ -230,7 +308,7 @@ def create_flattening_select_statement(parquet_path: str) -> str:
                                 new_col_name = f"{alias}_D_{safe_val}"
                                 
                                 # Escape the value for SQL
-                                escaped_val = escape_sql_value(val)
+                                escaped_val = utils.escape_sql_value(val)
                                 
                                 # expr = f"CAST(CAST(array_contains({sql_path}, '{escaped_val}') AS INTEGER) AS STRING) AS \"{new_col_name}\"" 
                                 # select_exprs.append(expr)
