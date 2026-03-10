@@ -5,7 +5,7 @@ import core.utils as utils
 
 def flatten_table_file(destination_bucket: str, table_name: str) -> None:
     # Generate a SQL statement that "flattens" a Parquet file and then execute it to create a new file
-    source_parquet_path = utils.get_raw_parquet_file_location(destination_bucket, table_name)
+    source_parquet_path = utils.get_flattening_source_parquet_file_location(destination_bucket, table_name)
     flattened_file_path = utils.get_flattened_parquet_file_location(destination_bucket, table_name)
 
     # Build the SELECT statement
@@ -34,12 +34,14 @@ def flatten_table_file(destination_bucket: str, table_name: str) -> None:
             utils.close_duckdb_connection(conn, local_db_file)
 
 def create_boxes_field_select_statement(field_name: str, available_columns: set[str]) -> str:
+    """Project a boxes parent field as string, or NULL when a historical column is absent."""
     if field_name not in available_columns:
         return f'CAST(NULL AS STRING) AS "{field_name}"'
 
     return f'CAST(src."{field_name}" AS STRING) AS "{field_name}"'
 
 def create_boxes_bag_select_statement(bag_field: str, available_columns: set[str]) -> str:
+    """Build one UNION branch for a single bag column in the legacy boxes layout."""
     bag_ref = f'src."{bag_field}"'
     select_exprs = [
         create_boxes_field_select_statement(field_name, available_columns)
@@ -84,17 +86,29 @@ def create_boxes_bag_select_statement(bag_field: str, available_columns: set[str
     """
 
 def create_boxes_flattening_select_statement(parquet_path: str) -> str:
-    available_columns = utils.get_parquet_column_names(parquet_path)
+    """
+    Reproduce the legacy boxes flattening logic as DuckDB SQL.
 
-    if constants.BOXES_BAG_FIELDS[0] not in available_columns:
+    This expects boxes bag columns to have already been converted from raw BLOB into STRUCT,
+    which is why the boxes pipeline now has an explicit conversion step before flattening.
+    """
+    schema_map = utils.get_parquet_schema_map(parquet_path)
+    available_columns = set(schema_map)
+
+    if (
+        constants.BOXES_BAG_FIELDS[0] not in available_columns
+        or not schema_map[constants.BOXES_BAG_FIELDS[0]].startswith("STRUCT(")
+    ):
         raise Exception(
-            f"Boxes-specific flattening requires {constants.BOXES_BAG_FIELDS[0]} in {parquet_path}"
+            f"Boxes-specific flattening requires converted STRUCT data in "
+            f"{constants.BOXES_BAG_FIELDS[0]} for {parquet_path}"
         )
 
+    # Only bag fields that are present and converted to STRUCT can be safely unnested.
     bag_selects = [
         create_boxes_bag_select_statement(bag_field, available_columns)
         for bag_field in constants.BOXES_BAG_FIELDS
-        if bag_field in available_columns
+        if bag_field in available_columns and schema_map[bag_field].startswith("STRUCT(")
     ]
 
     if not bag_selects:

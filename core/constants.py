@@ -3,6 +3,7 @@ from enum import Enum
 SERVICE_NAME = "flattener"
 
 EXPORT_PARQUET_COMPRESSION="snappy"
+CONVERTED_PARQUET_DIRECTORY_NAME = "converted"
 
 DUCKDB_FORMAT_STRING = "(FORMAT 'parquet', COMPRESSION 'zstd')"
 DUCKDB_MEMORY_LIMIT = "10GB"
@@ -41,4 +42,8 @@ BOXES_BAG_TYPE_FIELDS = [
     ("d_787237543", "Blood/Urine"),
     ("d_223999569", "Mouth wash"),
     ("d_522094118", "Orphan bag"),
+]
+
+BOXES_BAG_FIELDS_WITH_TRACKING_ID = [
+    "d_650224161",
 ]
