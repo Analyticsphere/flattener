@@ -332,7 +332,8 @@ def convert_boxes_table_files(destination_bucket: str, table_name: str) -> None:
     bucket, raw_blobs = get_matching_gcs_blobs(raw_file_pattern)
     if not raw_blobs:
         raise Exception(f"No raw Parquet files found for {table_name} at {raw_file_pattern}")
-
+    
+    # Ensure task is idempotent by clearing any previously converted files before writing new ones
     gcp_client.delete_from_gcs_path(converted_directory)
 
     converted_file_count = 0
@@ -350,7 +351,8 @@ def convert_boxes_table_files(destination_bucket: str, table_name: str) -> None:
                 local_output_path,
             )
 
-            # Keep the original part filename so wildcard reads preserve the raw file fan-out.
+            # Keep the original `part` filename so wildcard reads preserve the raw file fan-out
+            # expected in get_converted_parquet_file_location()
             output_blob = bucket.blob(f"{converted_prefix}/{os.path.basename(raw_blob.name)}")
             output_blob.upload_from_filename(local_output_path)
 
