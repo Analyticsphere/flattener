@@ -28,9 +28,9 @@ def create_duckdb_connection() -> tuple[duckdb.DuckDBPyConnection, str]:
     try:
         random_string = str(uuid.uuid4())
         
-        # Cloud Run mounts /mnt/data, but local/dev environments generally do not.
-        tmp_dir = "/mnt/data" if os.path.isdir("/mnt/data") else tempfile.gettempdir()
-        local_db_file = os.path.join(tmp_dir, f"{random_string}.db")
+        # GCS bucket mounted to /mnt/data/ in clouldbuild.yml
+        tmp_dir = f"/mnt/data/"
+        local_db_file = f"{tmp_dir}{random_string}.db"
 
         conn = duckdb.connect(local_db_file)
         conn.execute(f"SET temp_directory='{tmp_dir}'")
@@ -47,11 +47,8 @@ def create_duckdb_connection() -> tuple[duckdb.DuckDBPyConnection, str]:
         # Set max disk space to allow on GCS
         conn.execute(f"SET max_temp_directory_size='{constants.DUCKDB_MAX_SIZE}'")
 
-        # Register GCS filesystem to read/write to GCS buckets when available.
-        try:
-            conn.register_filesystem(filesystem('gcs'))
-        except ImportError:
-            logger.warning("gcsfs is not available; skipping GCS filesystem registration")
+        # Register GCS filesystem to read/write to GCS buckets
+        conn.register_filesystem(filesystem('gcs'))
 
         return conn, local_db_file
     except Exception as e:
