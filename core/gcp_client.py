@@ -1,9 +1,9 @@
 import json
 from typing import Optional
 
-from google.cloud import bigquery  # type: ignore[attr-defined]
-from google.cloud import pubsub_v1  # type: ignore[attr-defined]
-from google.cloud import storage  # type: ignore[attr-defined]
+from google.cloud import bigquery  # type: ignore
+from google.cloud import pubsub_v1  # type: ignore
+from google.cloud import storage  # type: ignore
 
 import core.constants as constants
 import core.utils as utils
