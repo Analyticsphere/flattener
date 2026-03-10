@@ -4,8 +4,8 @@ import shutil
 import tempfile
 from typing import Any, Optional
 
-import pyarrow as pa
-import pyarrow.parquet as pq
+import pyarrow as pa  # type: ignore[import-untyped]
+import pyarrow.parquet as pq  # type: ignore[import-untyped]
 from google.cloud import storage  # type: ignore
 
 import core.constants as constants
@@ -272,7 +272,7 @@ def convert_boxes_parquet_file(input_path: str, output_path: str) -> tuple[list[
 
         if pa.types.is_binary(field.type) and target_type is not None:
             # Only known bag columns are decoded. Other BLOB columns are preserved as-is.
-            decoded_values = []
+            decoded_values: list[Any] = []
             for blob in column.to_pylist():
                 if blob is None:
                     decoded_values.append(None)
