@@ -1,0 +1,1 @@
+"""Core flattener package."""

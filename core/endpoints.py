@@ -5,6 +5,7 @@ from typing import Any, Optional
 from flask import Flask, jsonify, request  # type: ignore
 
 import core.constants as constants
+import core.convert as convert
 import core.flatten as flatten
 import core.gcp_client as gcp_client
 import core.utils as utils
@@ -74,6 +75,24 @@ def flatten_parquet() -> tuple[str, int]:
     except Exception as e:
         utils.logger.error(f"Unable to flatten {table_id} Parquet files: {str(e)}")
         return f"Unable to flatten {table_id} Parquet files: {str(e)}", 500
+
+@app.route('/convert_parquet', methods=['POST'])
+def convert_parquet() -> tuple[str, int]:
+    """Run any required pre-flatten Parquet conversion, such as boxes BLOB decoding."""
+    data: dict[str, Any] = request.get_json() or {}
+    destination_bucket: Optional[str] = data.get('destination_bucket')
+    table_id: Optional[str] = data.get('table_id')
+
+    if not table_id or not destination_bucket:
+        return "Missing required parameters: table_id, destination_bucket", 400
+
+    try:
+        utils.logger.info(f"Converting {table_id} Parquet files")
+        convert.convert_table_file(destination_bucket, table_id)
+        return f"Converted {table_id} Parquet files", 200
+    except Exception as e:
+        utils.logger.error(f"Unable to convert {table_id} Parquet files: {str(e)}")
+        return f"Unable to convert {table_id} Parquet files: {str(e)}", 500
 
 @app.route('/parquet_to_table', methods=['POST'])
 def parquet_to_bq() -> tuple[str, int]:

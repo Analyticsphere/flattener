@@ -1,7 +1,9 @@
 import logging
 import os
 import sys
+import tempfile
 import uuid
+from typing import Any
 
 import duckdb
 from fsspec import filesystem  # type: ignore
@@ -70,9 +72,53 @@ def get_raw_parquet_file_location(destination_bucket: str, table_name: str) -> s
     parquet_path = f"gs://{destination_bucket}/{table_name}/{table_name}_part*.parquet"
     return parquet_path
 
+def get_converted_parquet_directory(destination_bucket: str, table_name: str) -> str:
+    """Directory that holds pre-flatten converted Parquet files for tables that need them."""
+    return f"gs://{destination_bucket}/{table_name}/{constants.CONVERTED_PARQUET_DIRECTORY_NAME}"
+
+def get_converted_parquet_file_location(destination_bucket: str, table_name: str) -> str:
+    """Wildcard path for converted Parquet part files."""
+    parquet_path = (
+        f"{get_converted_parquet_directory(destination_bucket, table_name)}/{table_name}_part*.parquet"
+    )
+    return parquet_path
+
+def get_flattening_source_parquet_file_location(destination_bucket: str, table_name: str) -> str:
+    """Return the Parquet location the flatten step should read from for a given table."""
+    if table_name.lower() == constants.SPECIAL_LOGIC_TABLES.BOXES.value:
+        return get_converted_parquet_file_location(destination_bucket, table_name)
+
+    return get_raw_parquet_file_location(destination_bucket, table_name)
+
 def get_flattened_parquet_file_location(destination_bucket: str, table_name: str) -> str:
     parquet_path = f"gs://{destination_bucket}/{table_name}/flattened/{table_name}.parquet"
     return parquet_path
+
+def get_parquet_column_names(parquet_path: str) -> set[str]:
+    return set(get_parquet_schema_map(parquet_path))
+
+def get_parquet_schema_map(parquet_path: str) -> dict[str, str]:
+    """Describe a Parquet file and return ``column_name -> DuckDB column_type``."""
+    conn, local_db_file = create_duckdb_connection()
+
+    try:
+        with conn:
+            schema = conn.execute(
+                f"DESCRIBE SELECT * FROM read_parquet('{parquet_path}') LIMIT 0"
+            ).fetchdf()
+            return dict(zip(schema["column_name"], schema["column_type"]))
+    except Exception as e:
+        logger.error(f"Unable to describe incoming Parquet file: {e}")
+        raise Exception(f"Unable to describe incoming Parquet file: {e}") from e
+    finally:
+        close_duckdb_connection(conn, local_db_file)
+
+def escape_sql_value(val: Any) -> str:
+    """Escape a dynamic value for safe interpolation into generated DuckDB SQL."""
+    if val is None:
+        return "NULL"
+
+    return str(val).replace("\\", "\\\\").replace("'", "''").replace('"', '\\"')
 
 def valid_parquet_file(gcs_file_path: str) -> bool:
     # Retuns bool indicating whether Parquet file is valid/can be read by DuckDB
